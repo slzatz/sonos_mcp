@@ -450,7 +450,17 @@ def play_track(track):
 def search_track(track):
     results = ms.search("tracks", track)
 
-    titles = [t.title+'-'+t.metadata.get('track_metadata').metadata.get('artist') for t in results]
+    # Include album information: Title-Artist-Album
+    titles = []
+    for t in results:
+        track_meta = t.metadata.get('track_metadata')
+        if track_meta and track_meta.metadata:
+            artist = track_meta.metadata.get('artist', 'Unknown Artist')
+            album = track_meta.metadata.get('album', 'Unknown Album')
+            titles.append(f"{t.title}-{artist}-{album}")
+        else:
+            titles.append(f"{t.title}-Unknown Artist-Unknown Album")
+    
     title_list = "\n".join([f"{t[0]}. {t[1]}" for t in enumerate(titles, start=1)])
 #    filename = 'sonos_search_results.pkl'
 #
