@@ -15,8 +15,8 @@ class ClaudeCodeMusicAgent(MusicAgent):
     """
     Enhanced MusicAgent that integrates with Claude Code's Task subagent capabilities.
     
-    This subclass overrides the _call_selection_subagent method to use Claude Code's
-    Task tool for LLM-powered result selection when available.
+    This subclass overrides methods to use standardized prompts instead of ad-hoc prompts,
+    and integrates with Claude Code's Task tool for LLM-powered result selection.
     """
     
     def __init__(self, task_function=None):
@@ -45,32 +45,117 @@ class ClaudeCodeMusicAgent(MusicAgent):
         else:
             # Task function not available, use programmatic fallback
             return ""
-
-
-def parse_music_request_llm(request: str) -> Dict[str, Any]:
-    """
-    Parse a natural language music request using LLM capabilities.
     
-    This function is designed to be called by Claude Code, which can use
-    the Task tool to perform intelligent natural language parsing.
+    def _llm_select_best_match(self, results, target_title: str, 
+                              target_artist: str = None, preferences = None):
+        """
+        Use standardized prompt template for LLM-powered result selection.
+        
+        This overrides the base class method to use consistent prompt templates
+        instead of ad-hoc prompt generation.
+        """
+        try:
+            from music_parsing_prompts import format_result_selection_prompt
+            
+            # Generate standardized prompt using template
+            prompt = format_result_selection_prompt(
+                title=target_title,
+                artist=target_artist, 
+                preferences=preferences or {},
+                results=results
+            )
+            
+            if not prompt:
+                return None
+                
+            # Call Task subagent for selection
+            result = self._call_selection_subagent(prompt)
+            
+            # Parse result to get position number
+            if result and result.strip():
+                try:
+                    position = int(result.strip().split()[0])  # Get first number
+                    # Validate position is in results
+                    if any(r['position'] == position for r in results):
+                        return position
+                except (ValueError, IndexError):
+                    pass
+            
+        except ImportError:
+            print("music_parsing_prompts not found, falling back to base implementation")
+            return super()._llm_select_best_match(results, target_title, target_artist, preferences)
+        except Exception as e:
+            print(f"Standardized LLM selection error: {e}")
+        
+        return None
+
+
+def parse_music_request_llm(request: str, task_function=None) -> Dict[str, Any]:
+    """
+    Parse a natural language music request using LLM capabilities with standardized prompts.
+    
+    This function uses standardized prompt templates to ensure consistent parsing behavior
+    instead of ad-hoc prompts written during Claude Code conversations.
     
     Args:
         request: Natural language music request
+        task_function: Claude Code's Task function (required for LLM parsing)
         
     Returns:
         Dict with parsed components: {'title': str, 'artist': str|None, 'preferences': dict}
         
-    Note:
-        This function requires access to Claude Code's Task tool and should be called
-        from within a Claude Code session, not as standalone Python code.
+    Example:
+        # Called from Claude Code with Task function:
+        parsed = parse_music_request_llm("Neil Young's Harvest", task_function=Task)
+        # Returns: {'title': 'harvest', 'artist': 'neil young', 'preferences': {}}
     """
-    # This will be implemented by Claude Code using the Task tool during conversations
-    # For now, return a placeholder that indicates LLM parsing is needed
-    return {
-        'requires_llm_parsing': True,
-        'original_request': request,
-        'message': 'This function should be called by Claude Code with Task tool access'
-    }
+    if not task_function:
+        return {
+            'error': 'Task function required - this must be called from Claude Code session',
+            'original_request': request,
+            'message': 'Pass task_function=Task when calling from Claude Code'
+        }
+    
+    try:
+        from music_parsing_prompts import STANDARD_MUSIC_PARSING_PROMPT
+        
+        # Format the standardized prompt with the actual request
+        prompt = STANDARD_MUSIC_PARSING_PROMPT.format(request=request)
+        
+        # Call Claude Code's Task tool with standardized prompt
+        result = task_function(
+            description="Parse music request",
+            prompt=prompt,
+            subagent_type="general-purpose"
+        )
+        
+        # The LLM should return JSON, but handle string responses too
+        if isinstance(result, str):
+            import json
+            try:
+                parsed_result = json.loads(result)
+                return parsed_result
+            except json.JSONDecodeError:
+                # If not valid JSON, return error with raw result
+                return {
+                    'error': 'LLM returned non-JSON response',
+                    'raw_response': result,
+                    'original_request': request
+                }
+        else:
+            # Result is already a dict/object
+            return result
+            
+    except ImportError:
+        return {
+            'error': 'music_parsing_prompts module not found',
+            'original_request': request
+        }
+    except Exception as e:
+        return {
+            'error': f'Parsing failed: {str(e)}',
+            'original_request': request
+        }
 
 
 def play_music_parsed_with_llm(title: str, artist: str = None, preferences: Dict[str, Any] = None, 

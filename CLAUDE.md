@@ -92,18 +92,14 @@ Claude Code now has MULTIPLE approaches for handling music requests, from fully 
 **For any detected music request, use the fully LLM-powered approach:**
 
 ```python
-from claude_music_interface import play_music_parsed_with_llm
+from claude_music_interface import play_music_parsed_with_llm, parse_music_request_llm
 
-# OPTIMAL: Full LLM workflow (parsing + result selection)
+# OPTIMAL: Full LLM workflow with standardized prompts (parsing + result selection)
 def handle_music_request(user_request):
-    # Step 1: LLM-powered parsing
-    parsed = Task(
-        description="Parse music request",
-        prompt=f"Parse '{user_request}' into title, artist, preferences...",
-        subagent_type="general-purpose"
-    )
+    # Step 1: LLM-powered parsing with standardized prompt
+    parsed = parse_music_request_llm(user_request, task_function=Task)
     
-    # Step 2: LLM-powered result selection  
+    # Step 2: LLM-powered result selection with standardized prompt
     result = play_music_parsed_with_llm(
         parsed['title'], 
         parsed['artist'], 
@@ -111,6 +107,20 @@ def handle_music_request(user_request):
         task_function=Task  # Enable hybrid LLM selection
     )
     return result
+```
+
+**Alternative approach with manual Task calls:**
+```python
+# Step 1: Manual LLM-powered parsing (uses standardized prompt internally)
+from music_parsing_prompts import STANDARD_MUSIC_PARSING_PROMPT
+
+parsed = Task(
+    description="Parse music request",
+    prompt=STANDARD_MUSIC_PARSING_PROMPT.format(request=user_request),
+    subagent_type="general-purpose"
+)
+
+# Step 2: Continue with hybrid agent...
 ```
 
 #### Hybrid Agent Capabilities
@@ -384,6 +394,78 @@ Search results:
 The system detects that "Live from the Artists Den" indicates a live album and selects position 2, even though the track title doesn't contain "live".
 
 This approach handles variations like remasters, live versions, and fuzzy title matching while intelligently preferring the requested version type using both track titles and album context.
+
+## Standardized Prompt System
+
+### Overview
+The music request parsing now uses **standardized prompt templates** instead of ad-hoc prompts written during conversations. This ensures consistent behavior and makes the parsing logic maintainable.
+
+### Key Files
+- **`music_parsing_prompts.py`**: Centralized prompt templates
+- **`claude_music_interface.py`**: Enhanced with standardized prompt integration
+
+### Standardized Parsing Function
+```python
+from claude_music_interface import parse_music_request_llm
+
+# Use standardized parsing (requires Claude Code Task function)
+parsed = parse_music_request_llm(
+    "I'd like to hear a live version of Neil Young's Harvest",
+    task_function=Task  # Claude Code provides this
+)
+
+# Returns consistent format:
+# {
+#   "title": "harvest",
+#   "artist": "neil young", 
+#   "preferences": {"prefer_live": true}
+# }
+```
+
+### Prompt Templates Available
+
+#### 1. Standard Music Parsing
+- **Template**: `STANDARD_MUSIC_PARSING_PROMPT`
+- **Purpose**: Parse title, artist, preferences from natural language
+- **Output**: `{"title": str, "artist": str|null, "preferences": dict}`
+
+#### 2. Enhanced Music Parsing (Ready for Extension)
+- **Template**: `ENHANCED_MUSIC_PARSING_PROMPT` 
+- **Purpose**: Same as standard + album information
+- **Output**: `{"title": str, "artist": str|null, "album": str|null, "preferences": dict}`
+
+#### 3. Result Selection
+- **Function**: `format_result_selection_prompt()`
+- **Purpose**: Generate standardized prompts for choosing best track from search results
+- **Usage**: Automatically used by `ClaudeCodeMusicAgent`
+
+### Benefits of Standardization
+
+#### Before (Ad-hoc):
+```python
+# Inconsistent prompts written during conversations
+Task(prompt="Parse 'Neil Young's Harvest' and extract...")  # Variable instructions
+```
+
+#### After (Standardized):
+```python
+# Consistent, maintainable templates
+from music_parsing_prompts import STANDARD_MUSIC_PARSING_PROMPT
+Task(prompt=STANDARD_MUSIC_PARSING_PROMPT.format(request="Neil Young's Harvest"))
+```
+
+### Advantages
+- **🎯 Consistency**: Same parsing logic every time
+- **📋 Maintainability**: Easy to modify parsing rules in one place
+- **🔍 Transparency**: You can see exactly what instructions the LLM gets
+- **🧪 Testability**: Standardized prompts can be refined and tested
+- **📈 Extensibility**: Ready foundation for adding album or other fields
+
+### Integration with ClaudeCodeMusicAgent
+The enhanced agent now uses standardized prompts for both parsing and result selection:
+- **Parsing**: Uses `STANDARD_MUSIC_PARSING_PROMPT` template
+- **Selection**: Uses `format_result_selection_prompt()` function
+- **Fallback**: Gracefully falls back to base implementation if templates unavailable
 
 ## Known Issues
 

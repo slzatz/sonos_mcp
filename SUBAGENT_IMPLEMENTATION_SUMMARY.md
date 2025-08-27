@@ -1,7 +1,10 @@
 # Claude Code Subagent Implementation Summary
 
 ## Overview
-Successfully transformed the music request system from regex-based parsing to true LLM-powered natural language understanding using Claude Code's native subagent capabilities. This represents the evolution from "Python class pretending to be smart" to "actual LLM-powered agent using Claude Code's native capabilities."
+Successfully transformed the music request system from regex-based parsing to true LLM-powered natural language understanding using Claude Code's native subagent capabilities with **standardized prompt templates**. This represents the evolution from "Python class pretending to be smart" to "actual LLM-powered agent using Claude Code's native capabilities with consistent, maintainable prompts."
+
+## Latest Update: Standardized Prompt System ✨
+The system now uses **standardized prompt templates** instead of ad-hoc prompts, ensuring consistent parsing behavior and making the system maintainable and extensible.
 
 ## Architecture Evolution
 
@@ -162,6 +165,92 @@ play_music_parsed("comfortably numb", "pink floyd", {"prefer_acoustic": True})
 # Search without playing:
 results = search_music_parsed("harvest", "neil young", {"prefer_live": True})
 print(f"Found {results['total_results']} live versions")
+```
+
+## 📝 **Standardized Prompt System Implementation**
+
+### **Key Enhancement: From Ad-hoc to Standardized**
+
+**Previous (Ad-hoc Prompts):**
+```python
+# Prompts were improvised during Claude Code conversations
+Task(prompt="Parse 'Neil Young's Harvest' and extract title and artist...")  # Inconsistent
+Task(prompt="Analyze these search results and pick the best...")              # Variable
+```
+
+**Current (Standardized Templates):**
+```python
+# Consistent, well-tested prompt templates
+from music_parsing_prompts import STANDARD_MUSIC_PARSING_PROMPT
+from claude_music_interface import parse_music_request_llm
+
+# Parsing with standardized template
+parsed = parse_music_request_llm(user_request, task_function=Task)
+
+# Selection uses standardized template (automatic in ClaudeCodeMusicAgent)
+```
+
+### **New Files Added:**
+
+#### `music_parsing_prompts.py`
+- **`STANDARD_MUSIC_PARSING_PROMPT`**: Comprehensive parsing instructions
+- **`ENHANCED_MUSIC_PARSING_PROMPT`**: Ready for album support  
+- **`format_result_selection_prompt()`**: Dynamic selection prompt generation
+
+#### Enhanced `claude_music_interface.py`
+- **`parse_music_request_llm()`**: Now uses standardized prompts (no longer placeholder)
+- **`ClaudeCodeMusicAgent`**: Overrides selection methods to use standardized templates
+
+### **Benefits Achieved:**
+
+#### 🎯 **Consistency**
+- Same parsing logic applied every time
+- Predictable JSON output format
+- Reliable preference extraction
+
+#### 📋 **Maintainability**
+- All prompt logic centralized in one file
+- Easy to modify parsing rules
+- Version-controlled prompt improvements
+
+#### 🔍 **Transparency** 
+- You can examine exact instructions given to LLM
+- No more "magic" ad-hoc prompts
+- Clear separation between templates and logic
+
+#### 🧪 **Testability**
+- Standardized prompts can be systematically tested
+- Consistent baseline for prompt refinement
+- Easier debugging of parsing issues
+
+#### 📈 **Extensibility**
+- `ENHANCED_MUSIC_PARSING_PROMPT` ready for album support
+- Template system supports any JSON output structure
+- Easy to add new preference types (acoustic, studio, etc.)
+
+### **Usage Examples:**
+
+#### Optimal Approach (Recommended)
+```python
+from claude_music_interface import parse_music_request_llm, play_music_parsed_with_llm
+
+# Step 1: Standardized parsing
+parsed = parse_music_request_llm("Neil Young's Harvest", task_function=Task)
+
+# Step 2: Hybrid selection with standardized prompts
+result = play_music_parsed_with_llm(
+    parsed['title'], parsed['artist'], parsed['preferences'],
+    task_function=Task  # Enables standardized LLM selection
+)
+```
+
+#### Manual Template Access (Advanced)
+```python
+from music_parsing_prompts import STANDARD_MUSIC_PARSING_PROMPT
+
+# Access standardized prompt directly
+prompt = STANDARD_MUSIC_PARSING_PROMPT.format(request="I want some live Beatles")
+parsed = Task("Parse music request", prompt, "general-purpose")
 ```
 
 ### 🎯 **Advanced LLM Selection Scenarios**
