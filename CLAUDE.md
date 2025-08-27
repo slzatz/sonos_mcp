@@ -66,72 +66,157 @@ The application integrates with Amazon Music as the primary music service (confi
 
 ## Claude Code Integration for Music Requests
 
-When users make natural language music requests like "play harvest by neil young", Claude Code should use this two-step workflow:
+Claude Code now has TWO approaches for handling music requests: an intelligent agent-based approach for natural language requests, and the traditional CLI approach for manual control.
 
-### 1. Search for Tracks
+### Automatic Music Request Detection
+
+**When Claude Code detects any of these natural language patterns, automatically use the music agent:**
+
+#### Natural Language Patterns
+- **Direct requests**: "play [song/artist]", "I'd like to hear...", "Can you play...", "Put on..."
+- **Artist possessive forms**: "Neil Young's Harvest", "Ani DiFranco's fixing her hair", "The Beatles' Here Comes the Sun"  
+- **Preference requests**: "live version of...", "acoustic version of...", "studio version of..."
+- **Casual requests**: "some [artist]", "something by [artist]", "[song] by [artist]"
+
+#### Auto-Detection Examples
+✅ **These should automatically trigger the music agent:**
+- "I'd like to hear a live version of Neil Young's Harvest"
+- "Play some Beatles"  
+- "Put on Ani DiFranco's fixing her hair"
+- "Can you play Harvest by Neil Young?"
+- "I want to hear something by Pink Floyd"
+- "Play a live version of Comfortably Numb"
+
+### Primary Method: Intelligent Music Agent (Recommended)
+
+For any detected music request, automatically use the intelligent agent:
+
+```python
+from claude_music_interface import play_music
+
+# Single-step intelligent workflow
+result = play_music(user_request)
+print(result)  # "Now playing: [Track] by [Artist]"
+```
+
+#### Agent Capabilities
+- **Natural Language Understanding**: Handles possessives, complex grammar, preferences
+- **Smart Search Strategy**: Multiple query variations with fallback strategies  
+- **API Error Recovery**: Automatically handles known Amazon Music API parsing issues
+- **Contextual Selection**: Uses reasoning to select best match from results
+- **Live Version Detection**: Intelligently finds live/acoustic/studio versions when requested
+
+#### Agent Examples
+```python
+# These all work automatically:
+play_music("I'd like to hear a live version of Neil Young's Harvest")
+play_music("Ani DiFranco's fixing her hair")  # Handles possessives perfectly
+play_music("something by The Beatles")
+play_music("play Comfortably Numb by Pink Floyd")
+```
+
+The agent handles the entire workflow internally - no need for separate search and selection steps.
+
+### Fallback Method: Manual CLI Workflow (Advanced Users)
+
+When you need manual control or the agent approach fails, use the traditional two-step process:
+
+#### 1. Search for Tracks
 ```bash
 sonos searchtrack harvest by neil young
 ```
 
-This returns a numbered list of search results in the format:
+Returns numbered results:
 ```
 1. Harvest Moon-Neil Young-Harvest Moon
-2. Harvest (2009 Remaster)-Neil Young-Harvest (2009 Remaster)
+2. Harvest (2009 Remaster)-Neil Young-Harvest (2009 Remaster)  
 3. Heart of Gold-Neil Young-Harvest
 4. Harvest-Neil Young-Harvest
 5. Harvest (Live)-Neil Young & Stray Gators-Tuscaloosa (Live)
-...
 ```
 
-### 2. Select and Play Best Match
+#### 2. Select and Play
 ```bash
 sonos playtrackfromlist 4
 ```
 
-Uses the position number (1-indexed) to play the selected track.
+#### When to Use Manual CLI
+- **Advanced Control**: When you want to see all search results before selecting
+- **Agent Fails**: If the intelligent agent can't find what you want
+- **Debugging**: When you need to understand why a search behaved a certain way
+- **Scripting**: When building automated workflows
 
-### Search Result Analysis
+### Additional Sonos Commands
 
-The search results are stored in `sonos_track_uris.json` and display as:
-- **Format**: `number. Title-Artist-Album`
-- **Parsing**: Split on `-` to separate title, artist, and album
-- **Matching**: Look for exact title matches, then fuzzy matches
-- **Album-Aware Live Detection**: Identifies live versions from album names like "Live from the Artists Den", "Tuscaloosa (Live)", etc.
-- **Preferences**: 
-  - Exact title matches over partial matches
-  - When live versions requested: Boost tracks from live albums
-  - When studio versions preferred: Prefer studio albums over remasters/live versions
-  - Artist name matching for disambiguation
-  - Album context for enhanced live version detection
+**Playback Control:**
+- `sonos what` - Current track info
+- `sonos pause` / `sonos resume` - Pause/resume playback  
+- `sonos louder` / `sonos quieter` - Volume control
+- `sonos showqueue` - View playback queue
 
-### Smart Selection Logic
+**Alternative Interface Functions:**
+```python  
+from claude_music_interface import pause_music, resume_music, get_current_track
 
-For the request "play harvest by neil young":
-1. Look for exact title match "Harvest" by "Neil Young"
-2. Prefer original over "(2009 Remaster)" or "Live" versions
-3. If multiple exact matches exist, select the first non-remastered version
-4. If no exact matches, use fuzzy matching on title similarity
+pause_music()     # Pause playback
+resume_music()    # Resume playback  
+get_current_track()  # Get current track info
+```
 
-### Example Workflow
+## Decision Tree for Claude Code
 
-User request: "play harvest by neil young"
-1. Execute: `sonos searchtrack harvest by neil young`
-2. Parse results and identify "4. Harvest-Neil Young" as best match
-3. Execute: `sonos playtrackfromlist 4`
-4. Confirm: "Playing Harvest by Neil Young"
+**Use this decision tree to determine how to handle user requests:**
 
-### Common Commands for Claude Code
+```
+User Request → Contains music patterns? 
+                ↓
+              YES → Use Agent: play_music(request)
+                ↓
+              NO → Regular sonos CLI command or other action
+```
 
-- Search: `sonos searchtrack <query>`
-- Play from list: `sonos playtrackfromlist <number>`
-- Current track: `sonos what`
-- Pause/Resume: `sonos pause` / `sonos resume`
-- Volume: `sonos louder` / `sonos quieter`
-- Queue: `sonos showqueue`
+### Music Request Detection Patterns
 
-## Helper Functions
+**Automatically trigger the music agent when user input contains:**
 
-The `sonos_helpers.py` module provides utility functions for Claude Code to process music requests:
+#### High-Confidence Patterns (Definite music requests)
+- **Command verbs**: "play", "put on", "start", "queue up"
+- **Request phrases**: "I'd like to hear", "Can you play", "I want to listen to" 
+- **Possessive forms**: "[Artist]'s [Song]" (e.g., "Neil Young's Harvest")
+- **By constructions**: "[Song] by [Artist]" (e.g., "Harvest by Neil Young")
+
+#### Medium-Confidence Patterns (Likely music requests)  
+- **Preference requests**: "live version of", "acoustic version", "studio version"
+- **Casual requests**: "some [artist]", "something by [artist]"
+- **Artist mentions**: Names of known musicians in context
+
+#### Pattern Examples with Expected Actions
+```
+✅ "I'd like to hear a live version of Neil Young's Harvest" 
+   → play_music("I'd like to hear a live version of Neil Young's Harvest")
+
+✅ "Play some Beatles" 
+   → play_music("Play some Beatles")
+
+✅ "Put on Ani DiFranco's fixing her hair"
+   → play_music("Put on Ani DiFranco's fixing her hair")
+
+✅ "Can you play Harvest by Neil Young?"
+   → play_music("Can you play Harvest by Neil Young?")
+
+❌ "What's the current track?"
+   → get_current_track() or sonos what
+
+❌ "Pause the music"  
+   → pause_music() or sonos pause
+
+❌ "Make it louder"
+   → sonos louder
+```
+
+## Legacy Helper Functions (Deprecated)
+
+The `sonos_helpers.py` module is now deprecated in favor of the intelligent agent, but remains available for reference:
 
 ### Key Functions
 
