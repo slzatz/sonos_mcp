@@ -66,11 +66,11 @@ The application integrates with Amazon Music as the primary music service (confi
 
 ## Claude Code Integration for Music Requests
 
-Claude Code now has TWO approaches for handling music requests: an intelligent agent-based approach for natural language requests, and the traditional CLI approach for manual control.
+Claude Code now has MULTIPLE approaches for handling music requests, from fully automated LLM-powered intelligence to manual control.
 
 ### Automatic Music Request Detection
 
-**When Claude Code detects any of these natural language patterns, automatically use the music agent:**
+**When Claude Code detects any of these natural language patterns, automatically use the optimal LLM-powered approach:**
 
 #### Natural Language Patterns
 - **Direct requests**: "play [song/artist]", "I'd like to hear...", "Can you play...", "Put on..."
@@ -87,35 +87,71 @@ Claude Code now has TWO approaches for handling music requests: an intelligent a
 - "I want to hear something by Pink Floyd"
 - "Play a live version of Comfortably Numb"
 
-### Primary Method: Intelligent Music Agent (Recommended)
+### Primary Method: Hybrid LLM-Powered Agent (Optimal)
 
-For any detected music request, automatically use the intelligent agent:
+**For any detected music request, use the fully LLM-powered approach:**
 
 ```python
-from claude_music_interface import play_music
+from claude_music_interface import play_music_parsed_with_llm
 
-# Single-step intelligent workflow
-result = play_music(user_request)
-print(result)  # "Now playing: [Track] by [Artist]"
+# OPTIMAL: Full LLM workflow (parsing + result selection)
+def handle_music_request(user_request):
+    # Step 1: LLM-powered parsing
+    parsed = Task(
+        description="Parse music request",
+        prompt=f"Parse '{user_request}' into title, artist, preferences...",
+        subagent_type="general-purpose"
+    )
+    
+    # Step 2: LLM-powered result selection  
+    result = play_music_parsed_with_llm(
+        parsed['title'], 
+        parsed['artist'], 
+        parsed['preferences'],
+        task_function=Task  # Enable hybrid LLM selection
+    )
+    return result
 ```
 
-#### Agent Capabilities
-- **Natural Language Understanding**: Handles possessives, complex grammar, preferences
+#### Hybrid Agent Capabilities
+- **Natural Language Understanding**: Perfect parsing of possessives, complex grammar, preferences
+- **Intelligent Result Selection**: Uses music knowledge to choose optimal versions
+- **Smart Complexity Detection**: Only uses LLM when algorithmic approach insufficient
+- **Music Industry Knowledge**: Understands albums, collaborations, version types, authenticity
+- **Contextual Decision Making**: Prefers originals over compilations, authentic over covers
 - **Smart Search Strategy**: Multiple query variations with fallback strategies  
 - **API Error Recovery**: Automatically handles known Amazon Music API parsing issues
-- **Contextual Selection**: Uses reasoning to select best match from results
-- **Live Version Detection**: Intelligently finds live/acoustic/studio versions when requested
 
-#### Agent Examples
+#### Hybrid Agent Examples
 ```python
-# These all work automatically:
-play_music("I'd like to hear a live version of Neil Young's Harvest")
-play_music("Ani DiFranco's fixing her hair")  # Handles possessives perfectly
-play_music("something by The Beatles")
-play_music("play Comfortably Numb by Pink Floyd")
+# Complex cases use LLM intelligence:
+handle_music_request("I'd like to hear a live version of Neil Young's Harvest")
+# → LLM parses request AND chooses best live version from search results
+
+handle_music_request("Ani DiFranco's fixing her hair")  
+# → Perfect possessive parsing, intelligent result selection
+
+handle_music_request("Like a Hurricane by Neil Young")
+# → LLM chooses original studio album over compilations/covers
+
+# Simple cases use fast algorithmic selection:
+handle_music_request("Bohemian Rhapsody by Queen")  
+# → Fast selection without LLM overhead for obvious matches
 ```
 
-The agent handles the entire workflow internally - no need for separate search and selection steps.
+### Alternative Method: Standard LLM Parsing (Good)
+
+For simpler integration without hybrid result selection:
+
+```python
+from claude_music_interface import play_music_parsed
+
+# Step 1: LLM-powered parsing (same as above)
+parsed = Task(description="Parse music request", prompt="...", subagent_type="general-purpose")
+
+# Step 2: Standard result selection (algorithmic only)
+result = play_music_parsed(parsed['title'], parsed['artist'], parsed['preferences'])
+```
 
 ### Fallback Method: Manual CLI Workflow (Advanced Users)
 
@@ -170,10 +206,20 @@ get_current_track()  # Get current track info
 ```
 User Request → Contains music patterns? 
                 ↓
-              YES → Use Agent: play_music(request)
+              YES → Use Hybrid LLM Agent:
+                    1. Parse with Task subagent
+                    2. Call play_music_parsed_with_llm() with Task function
                 ↓
               NO → Regular sonos CLI command or other action
 ```
+
+### Optimization Guidelines
+
+**For BEST results, always use the hybrid approach:**
+1. **LLM Parsing**: Use Task subagent to parse natural language
+2. **LLM Result Selection**: Pass Task function to enable intelligent selection  
+3. **Automatic Complexity Detection**: System decides when to use LLM vs algorithmic selection
+4. **Graceful Fallback**: Falls back to programmatic selection if LLM unavailable
 
 ### Music Request Detection Patterns
 
@@ -193,16 +239,19 @@ User Request → Contains music patterns?
 #### Pattern Examples with Expected Actions
 ```
 ✅ "I'd like to hear a live version of Neil Young's Harvest" 
-   → play_music("I'd like to hear a live version of Neil Young's Harvest")
+   → Full LLM workflow: parse + hybrid selection
 
 ✅ "Play some Beatles" 
-   → play_music("Play some Beatles")
+   → Full LLM workflow: parse + hybrid selection
 
 ✅ "Put on Ani DiFranco's fixing her hair"
-   → play_music("Put on Ani DiFranco's fixing her hair")
+   → Full LLM workflow: parse + hybrid selection  
 
 ✅ "Can you play Harvest by Neil Young?"
-   → play_music("Can you play Harvest by Neil Young?")
+   → Full LLM workflow: parse + hybrid selection
+
+✅ "Like a Hurricane by Neil Young"
+   → Full LLM workflow: LLM chooses original album over covers/compilations
 
 ❌ "What's the current track?"
    → get_current_track() or sonos what
@@ -213,6 +262,14 @@ User Request → Contains music patterns?
 ❌ "Make it louder"
    → sonos louder
 ```
+
+### Key Advantages of Hybrid Approach
+
+**🎯 Intelligent Result Selection Examples:**
+- **"Like a Hurricane by Neil Young"**: Chooses original "American Stars 'N Bars" album over Greatest Hits compilation
+- **"Harvest Moon live"**: Finds live recordings from concert albums like "Live at Massey Hall" 
+- **"Unplugged version of..."**: Understands MTV Unplugged albums are acoustic performances
+- **Multiple remasters**: Prefers original releases over anniversary/deluxe editions when no preference specified
 
 ## Legacy Helper Functions (Deprecated)
 

@@ -1,7 +1,15 @@
 # Music Request Agent Implementation Summary
 
+> **⚠️ DEPRECATED**: This document describes an intermediate implementation that has been **superseded by the new LLM-powered subagent approach**. 
+>
+> **→ For current implementation, see: [`SUBAGENT_IMPLEMENTATION_SUMMARY.md`](./SUBAGENT_IMPLEMENTATION_SUMMARY.md)**
+>
+> This document is preserved for historical context showing the evolution from pattern matching → regex-based agent → LLM-powered subagent.
+
 ## Overview
 Successfully implemented an intelligent agent-based approach to handle natural language music requests, replacing the rigid pattern-matching approach in `sonos_helpers.py` with LLM-powered natural language understanding.
+
+**NOTE**: This approach used Python regex for parsing, which proved inadequate for complex natural language. The current implementation uses Claude Code subagents with true LLM parsing capabilities.
 
 ## What Was Built
 
@@ -147,3 +155,13 @@ This replaces the need for the complex pattern matching in `sonos_helpers.py` an
 ## Conclusion
 
 The agent-based approach successfully demonstrates how LLM capabilities can solve complex natural language processing tasks that are difficult or impossible to handle with traditional pattern-matching approaches. The implementation is more robust, maintainable, and user-friendly than the previous solution.
+
+**However, this approach still relied on Python regex for parsing, which proved inadequate for complex cases like "play an acoustic version of Neil Young's Harvest". The current LLM-powered subagent implementation in [`SUBAGENT_IMPLEMENTATION_SUMMARY.md`](./SUBAGENT_IMPLEMENTATION_SUMMARY.md) solves these parsing issues completely using Claude Code's native subagent capabilities.**
+
+## Evolution Path
+
+1. **Pattern Matching** (`sonos_helpers.py`) - Rigid regex patterns ❌
+2. **Agent with Regex** (this document) - Smart search but brittle parsing ⚠️  
+3. **LLM-Powered Subagent** ([`SUBAGENT_IMPLEMENTATION_SUMMARY.md`](./SUBAGENT_IMPLEMENTATION_SUMMARY.md)) - True natural language understanding ✅
+
+The final implementation represents the ideal fusion of LLM intelligence with specialized domain logic.
