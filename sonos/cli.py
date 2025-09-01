@@ -230,7 +230,7 @@ def tracks(artist):
     zz = z.split(',')
     uris = [track_list[int(x)-1]['uri'] for x in zz]
     titles = [track_list[int(x)-1]['title'] for x in zz]
-    click.echo("\n".join(titles))
+    click.echo("\n".join(titles))
     sonos_actions.play(False, uris)
 
 @cli.command()
@@ -255,3 +255,21 @@ def playfromqueue(config, pos):
     else:
         click.echo(f"{s} is out of the range of the queue")
 
+@cli.command()
+@click.argument('user_request', type=str, required=True, nargs=-1)
+def smartplay(user_request):
+    '''"smartplay play burgundy shoes by patty griffin"
+
+    1. parse_play_request: parse the request into title and artist and preferences like "live" or "acoustic" - returns {title, artist, preferences}
+    '''
+    #d = sonos_actions.parse_play_request(" ".join(user_request))
+    # note the title and artist are not "cleaned" - that happens later
+    # but it should happen only once and before the search
+    title, artist, preferences = sonos_actions.parse_play_request(" ".join(user_request)).values()
+    #s = sonos_actions.generate_smart_search_queries(**d)
+    d = sonos_actions.generate_query_and_do_search(title, artist, preferences)
+    parsed_results = sonos_actions.parse_search_results(d["results"])
+    position = sonos_actions.intelligent_match_selection(parsed_results, d["title"], d["artist"], d["preferences"])
+    sonos_actions.play_track_from_search_list(position)
+    click.echo(parsed_results[position-1])
+    click.echo(title+artist)
