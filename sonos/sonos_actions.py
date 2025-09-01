@@ -51,6 +51,7 @@ from typing import Optional, Dict, Any, List, Tuple
 import soco
 from soco.discovery import by_name
 from soco.music_services import MusicService
+from soco.exceptions import MusicServiceAuthException
 from .config import music_service
 from .sonos_config import STATIONS, META_FORMAT_PANDORA, META_FORMAT_RADIO, \
                          DIDL_LIBRARY_PLAYLIST, DIDL_AMAZON, DIDL_SERVICE
@@ -451,8 +452,72 @@ def play_track(track):
     master.play_from_queue(len(queue) - 1)
     return results[0].title
 
+def generate_search_fallbacks(query):
+    """Generate simplified search terms for fallback when parsing fails."""
+    words = query.strip().split()
+    if len(words) <= 2:
+        return []
+    
+    fallbacks = []
+    
+    # Try removing one word at a time, starting from the beginning
+    for i in range(len(words)):
+        if i == 0:
+            # Skip first word
+            fallback = " ".join(words[1:])
+        else:
+            # Remove word at position i
+            fallback = " ".join(words[:i] + words[i+1:])
+        
+        if fallback not in fallbacks:
+            fallbacks.append(fallback)
+    
+    # Try keeping only the last 2-3 words (often artist name)
+    if len(words) >= 3:
+        fallback = " ".join(words[-2:])
+        if fallback not in fallbacks:
+            fallbacks.append(fallback)
+    
+    return fallbacks
+
+def search_track_with_retry(track, max_retries=5):
+    """Search for tracks with retry logic for AuthTokenExpired and parsing errors."""
+    # First try the original search with AuthToken retry logic
+    for attempt in range(max_retries):
+        try:
+            return ms.search("tracks", track)
+        except MusicServiceAuthException as e:
+            if "AuthTokenExpired" in str(e) and attempt < max_retries - 1:
+                print(f"API call failed (attempt {attempt + 1}/{max_retries}), retrying in 1 second...")
+                sleep(1)
+                continue
+            else:
+                # Re-raise if it's not AuthTokenExpired or we've exhausted retries
+                raise
+        except TypeError as e:
+            # This is likely the SoCo parsing bug, try fallback searches
+            if "string indices must be integers" in str(e):
+                print(f"Search parsing failed with '{track}', trying simplified searches...")
+                
+                fallbacks = generate_search_fallbacks(track)
+                for fallback in fallbacks:
+                    try:
+                        print(f"Trying: '{fallback}'")
+                        results = ms.search("tracks", fallback)
+                        print(f"Success with '{fallback}'")
+                        return results
+                    except (TypeError, MusicServiceAuthException):
+                        continue
+                
+                # If all fallbacks failed, re-raise original error
+                print(f"All fallback searches failed for '{track}'")
+                raise
+            else:
+                # Different TypeError, re-raise
+                raise
+
 def search_track(track):
-    results = ms.search("tracks", track)
+    results = search_track_with_retry(track)
 
     # Include album information: Title-Artist-Album
     titles = []
@@ -531,7 +596,7 @@ def play_track_from_search_list(position):
     #return (f"track: '{track.title}' by '{track.artist}'")
 
 def search_track2(track):
-    results = ms.search("tracks", track)
+    results = search_track_with_retry(track)
     return results
 
 def play_album(album):
@@ -742,7 +807,7 @@ def get_programmatic_scores(results: List[Dict[str, Any]], target_title_clean: s
         )
         
         if score > 0.3:  # Minimum viable match threshold
-            scored_matches.append((result['position'], score, result))
+            scored_matches.append((result['position'], score, result)) # pulling position out just simplifies bein able to do [0] to get position
     
     with open("scored_matches.json", 'w') as f:
         json.dump(scored_matches, f, indent=2)
@@ -824,7 +889,7 @@ def calculate_match_score(result: Dict[str, Any], target_title: str,
     else:
         combined_score = (title_score * 0.8) + version_score + 0.2
     
-    return max(0.0, min(1.0, combined_score))
+    return max(0.0, combined_score)
 
 def clean_for_matching(text: str) -> str:
     """Clean text for better matching by removing noise and normalizing."""

@@ -467,14 +467,79 @@ The enhanced agent now uses standardized prompts for both parsing and result sel
 - **Selection**: Uses `format_result_selection_prompt()` function
 - **Fallback**: Gracefully falls back to base implementation if templates unavailable
 
-## Known Issues
+## API Error Handling and Resilience
 
-### Amazon Music API Search Parsing Error
-Some specific search terms trigger a parsing error in the SoCo library:
-- **Error**: `TypeError: string indices must be integers, not 'str'`
-- **Cause**: Amazon Music API returns malformed responses for certain search combinations
-- **Example**: `sonos searchtrack "fixing her hair"` fails, but `sonos searchtrack "fixing hair"` works
-- **Workaround**: Try alternative search terms if a search fails unexpectedly
-- **Status**: Documented in `SEARCH_API_ISSUE.md` for future SoCo library fix
+The Sonos CLI now includes robust error handling for two types of intermittent API failures that can occur with music search operations.
 
-This is a known issue with the underlying SoCo library's parsing of Amazon Music API responses, not with our enhanced search system.
+### 1. AuthTokenExpired Retry Logic
+
+**Problem**: The Amazon Music API occasionally returns spurious `AuthTokenExpired` exceptions even when the token is valid.
+
+**Solution**: Automatic retry up to 5 times with 1-second delays between attempts.
+
+**User Experience**:
+```bash
+sonos searchtrack harvest neil young
+# If API fails: "API call failed (attempt 1/5), retrying in 1 second..."
+# Usually succeeds on retry 2-3
+```
+
+**Technical Details**:
+- Catches `MusicServiceAuthException` with "AuthTokenExpired" message
+- Retries the exact same search query
+- Implemented in `search_track_with_retry()` function
+
+### 2. SoCo Parsing Bug Fallback System
+
+**Problem**: Certain search terms trigger a `TypeError` in the SoCo library when parsing Amazon Music API responses due to malformed response data.
+
+**Solution**: Progressive search term simplification that tries alternative queries when parsing fails.
+
+**Examples of Problematic Searches**:
+- `"fixing her hair ani difranco"` → `TypeError`
+- `"some specific song titles"` → `TypeError`
+
+**Fallback Strategy**:
+When a `TypeError` occurs, the system automatically tries:
+1. Remove first word: `"her hair ani difranco"`
+2. Remove each word sequentially: `"fixing hair ani difranco"`, `"fixing her ani difranco"`, etc.
+3. Keep last 2-3 words (artist): `"ani difranco"`
+
+**User Experience**:
+```bash
+sonos searchtrack fixing her hair ani difranco
+# Output:
+# Search parsing failed with 'fixing her hair ani difranco', trying simplified searches...
+# Trying: 'her hair ani difranco'
+# Trying: 'fixing hair ani difranco'
+# Trying: 'fixing ani difranco'
+# Success with 'fixing ani difranco'
+# [Shows search results for the working query]
+```
+
+**Technical Details**:
+- Catches `TypeError` with "string indices must be integers" message
+- Uses `generate_search_fallbacks()` to create alternative search terms
+- Tries fallbacks sequentially until one succeeds
+- Informs user which simplified search succeeded
+
+### 3. Score Cap Removal
+
+**Problem**: Music preference scoring was capped at 1.0, preventing live/acoustic bonuses from working properly.
+
+**Solution**: Removed the artificial score cap to allow preference bonuses to differentiate tracks.
+
+**Impact**:
+- Live versions can now score >1.0 (e.g., 1.24) when requested
+- Studio versions score <1.0 (e.g., 0.9) when live versions are preferred
+- Proper ranking: preferred versions bubble to the top
+
+### Integration Points
+
+These improvements are automatically applied to:
+- `sonos searchtrack` command
+- `sonos smartplay` command  
+- Any function using `search_track()` or `search_track2()`
+- Future music search operations
+
+The error handling is transparent to users - searches that previously failed with exceptions now succeed with helpful feedback about any query modifications that were needed.
