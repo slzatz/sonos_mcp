@@ -52,14 +52,6 @@ def playstation(station):
     sonos_actions.play_station(station)
 
 @cli.command()
-@click.argument('title', required=True)
-@click.option("-a", "--artist", help="The artist for the track to be played")
-def playtrack_very_old(title, artist):
-    '''[play] Play a track -> sonos playtrack "harvest" -a "neil young"'''
-    msg = sonos_actions.play_track(title, artist)
-    click.echo(msg)
-
-@cli.command()
 @click.argument('track', type=click.STRING, required=True, nargs=-1)
 def playtrack(track):
     '''[play] Play a track -> sonos playtrack harvest by neil young"'''
@@ -85,24 +77,6 @@ def playtrackfromlist(position):
 def searchtrack2(track):
     '''[search] Play a track -> sonos playtrack harvest by neil young"'''
     msg = sonos_actions.search_track2(" ".join(track))
-    click.echo(msg)
-
-@cli.command()
-@click.argument('track', type=click.STRING, required=True, nargs=-1)
-def playtrack_old(track):
-    '''[play] Play a track -> sonos playtrack harvest by neil young"'''
-    tracklist = list(track)
-    title = []
-    artist = []
-    for word in track:
-        if word == "by":
-            tracklist.pop(0)
-            break
-        title.append(tracklist.pop(0))
-    for word in tuple(tracklist):
-        artist.append(tracklist.pop(0))
-    #print(f"{title=}; {artist=}")
-    msg = sonos_actions.play_track(" ".join(title), " ".join(artist))
     click.echo(msg)
 
 @cli.command()
@@ -258,15 +232,9 @@ def playfromqueue(config, pos):
 @cli.command()
 @click.argument('user_request', type=str, required=True, nargs=-1)
 def smartplay(user_request):
-    '''"smartplay play burgundy shoes by patty griffin"
-
-    1. parse_play_request: parse the request into title and artist and preferences like "live" or "acoustic" - returns {title, artist, preferences}
-    '''
-    #d = sonos_actions.parse_play_request(" ".join(user_request))
+    '''"smartplay burgundy shoes by patty griffin" '''
     # note the title and artist are not "cleaned" - that happens later
-    # but it should happen only once and before the search
     title, artist, preferences = sonos_actions.parse_play_request(" ".join(user_request)).values()
-    #s = sonos_actions.generate_smart_search_queries(**d)
     d = sonos_actions.generate_query_and_do_search(title, artist, preferences)
     parsed_results = sonos_actions.parse_search_results(d["results"])
     position = sonos_actions.intelligent_match_selection(parsed_results, d["title"], d["artist"], d["preferences"])

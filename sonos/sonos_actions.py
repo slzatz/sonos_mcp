@@ -275,9 +275,9 @@ def play(add, uris):
     # need this because may have selected multiple tracks and want to start from the top (like shuffle)
     if not add:
         play_from_queue(0) 
-    else:
-        queue = master.get_queue()
-        play_from_queue(len(queue) - 1)
+   # else:
+   #     queue = master.get_queue()
+   #     play_from_queue(len(queue) - 1)
 
 def play_station(station):
     station = STATIONS.get(station.lower())
@@ -427,24 +427,6 @@ def play_pause():
     #elif state!='ERROR':
     #    master.play()
 
-def play_track_old(title, artist=None):
-    s = 'title:' + ' AND title:'.join(title.split())
-    if artist:
-        s = s + ' artist:' + ' AND artist:'.join(artist.split())
-
-    result = solr.search(s, rows=1)
-
-    if result:
-        track = result.docs[0]
-        uri = track['uri']
-        play(True, [uri]) # add
-        msg = f"{track.get('title', '')} by {track.get('artist', '')} " \
-            f"from album {track.get('album', '')}"
-    else:
-        msg = f"Couldn't find track {title}{' by'+artist if artist else ''}"
-
-    return msg
-
 def play_track(track):
     results = ms.search("tracks", track)
     master.add_to_queue(results[0])
@@ -557,43 +539,11 @@ def search_track(track):
     return title_list
 
 def play_track_from_search_list(position):
-    filename = 'sonos_search_results.pkl'
-
-    #try:
-    #    # Open the file in binary read mode ('rb')
-    #    with open(filename, 'rb') as file:
-    #        # Use pickle.load to deserialize the object from the file
-    #        loaded_search_result = pickle.load(file)
-
-    #    # Now you can use the loaded object just like the original one
-    #    print("Successfully unpickled the search result.")
-    #    print(f"Search type: {loaded_search_result.search_type}")
-
-    #    # You can access the items just as before
-    #    if loaded_search_result.items:
-    #        track = loaded_search_result.items[position - 1]  # Adjust for zero-based index
-    #        # The MSTrack object has attributes like 'title', 'creator' (artist), etc.
-    #        master.add_to_queue(track)
-    #        queue = master.get_queue()
-    #        master.play_from_queue(len(queue) - 1)
-    #        return (f"track: '{track.title}' by '{track.artist}'")
-
-    #except FileNotFoundError:
-    #    return (f"Error: The file '{filename}' was not found.")
-    #except Exception as e:
-    #    return (f"An error occurred while unpickling: {e}")
     filename = "sonos_track_uris.json"
     with open(filename, 'r') as f:
         track_uris = json.load(f)
 
-    #print(f"Loaded metadata for {len(tracks_metadata)} tracks.")
-
-    # Wrap the raw metadata string in a DidlItem object
-    play(True, [track_uris[position- 1]]) # add
-   # master.add_to_queue(track_uris[position - 1])  # Adjust for zero-based index
-   # queue = master.get_queue()
-   # master.play_from_queue(len(queue) - 1)
-    #return (f"track: '{track.title}' by '{track.artist}'")
+    play(True, [track_uris[position-1]]) # add
 
 def search_track2(track):
     results = search_track_with_retry(track)
