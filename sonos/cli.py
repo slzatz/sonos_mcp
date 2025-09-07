@@ -58,6 +58,7 @@ def playtrack(track):
     msg = sonos_actions.play_track(" ".join(track))
     click.echo(msg)
 
+# used by claude_music 
 @cli.command()
 @click.argument('track', type=click.STRING, required=True, nargs=-1)
 def searchtrack(track):
@@ -66,10 +67,27 @@ def searchtrack(track):
     click.echo(msg)
 
 @cli.command()
+@click.argument('album', type=click.STRING, required=True, nargs=-1)
+def searchalbum(album):
+    '''Search for an album'''
+    msg = sonos_actions.search_album(" ".join(album))
+    click.echo(msg)
+
+# used by claude_music 
+@cli.command()
 @click.argument('position', type=int, required=True, nargs=1)
-def playtrackfromlist(position):
-    '''[search] Play a track -> sonos playtrack harvest by neil young"'''
-    msg = sonos_actions.play_track_from_search_list(position)
+def select(position):
+    '''select a track or album from an onscreen list'''
+    msg = sonos_actions.select_from_list(position)
+    click.echo(msg)
+
+@cli.command()
+@click.argument('positions', type=int, required=True, nargs=-1)
+def selectm(positions):
+    '''select a track or album from an onscreen list'''
+    print(positions)
+    for p in positions:
+        msg = sonos_actions.select_from_list(p)
     click.echo(msg)
 
 @cli.command()

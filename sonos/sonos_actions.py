@@ -1,42 +1,5 @@
 '''
-Script that is imported by sonos.py that deals with SoCo
-
-it uses the xml format that sonos uses to interact with Amazon music
-
-current_track = master.get_current_track_info() --> {
-            u'album': 'We Walked In Song', 
-            u'artist': 'The Innocence Mission', 
-            u'title': 'My Sisters Return From Ireland', 
-            u'uri': 'pndrradio-http://audio-sv5-t3-1.pandora.com/access/5459257820921908950?version=4&lid=86206018&token=...', 
-            u'playlist_position': '3', 
-            u'duration': '0:02:45', 
-            u'position': '0:02:38', 
-            u'album_art': 'http://cont-ch1-2.pandora.com/images/public/amz/3/2/9/3/655037093923_500W_500H.jpg'}
-
-If track is from Amazon Music (not purchased separately) the uri is:
-x-sonosapi-hls-static:catalog%2ftracks%2fB01E0N3W66%2f%3falbumAsin%3dB01E0N386A?sid=201&flags=0&sn=1
-x-sonosapi-hls-static:catalog/tracks/B01E0N3W66/?albumAsin?B01E0N386A?sid=201&flags=0&sn=1
-
-x-sonosapi-hls-static:catalog%2ftracks%2fB086RGP393%2f?sid=201&flags=0&sn=1
-x-sonosapi-hls-static:catalog/tracks/B086RGP393/?sid=201&flags=0&sn=1
-
-x-sonos-spotify:spotify%3atrack%3a7ykaUgkdQWJLsMuOymTV2A?sid=12&flags=8224&sn=3
-x-sonos-spotify:spotify:track:7ykaUgkdQWJLsMuOymTV2A?sid=12&flags=8224&sn=3
-
-If track is Prime but moved to my music (but not purchased) then url is (not sure this applies anymore):
-x-sonosapi-hls-static:library%2fartists%2fThe_20Avett_20Brothers%2fI_20And_20Love_20And_20You%2ff9aa6eac-6707-44bc-99ff-3aa2e5938d12%2f?sid=201&flags=0&sn=1' 
-x-sonosapi-hls-static:library/artists/The_20Avett_20Brothers/I_20And_20Love_20And_20You/f9aa6eac-6707-44bc-99ff-3aa2e5938d12%2f.mp3?sid=201&flags=0&sn=1' 
-
-If track has been purchased from Amazon:
-x-sonos-http:library%2fartists%2fThe_20Avett_20Brothers%2fI_20And_20Love_20And_20You%2ff9aa6eac-6707-44bc-99ff-3aa2e5938d12%2f.mp3?sid=201&flags=0&sn=1' 
-x-sonos-http:library/artists/The_20Avett_20Brothers/I_20And_20Love_20And_20You/f9aa6eac-6707-44bc-99ff-3aa2e5938d12%2f.mp3?sid=201&flags=0&sn=1' 
-
-if track was put on queue as part of a playlist
-x-sonos-http:library%2fplaylist%2f28f452a4-3414-456d-9146-9e9063868963%2f067b7994-615b-4f12-850b-4f12-850b-...mp3?sid...
-x-sonos-http:library/playlist/28f452a4-3414-456d-9146-9e9063868963%2f067b7994-615b-4f12-850b-4f12-850b-...mp3?sid...
-
-actions = {'play':play, 'turn_volume':turn_volume, 'set_volume':set_volume, 'playback':playback, 'what_is_playing':what_is_playing, 'recent_tracks':recent_tracks, 'play_station':play_station, 'list_queue': list_queue, 'clear_queue':clear_queue, 'mute':mute} 
-
+Module that is imported by cli.py that deals with SoCo and Sonos interaction
 '''
 
 import os
@@ -48,13 +11,18 @@ import random
 from operator import itemgetter 
 from typing import Optional, Dict, Any, List, Tuple
 
+import html
+from urllib.parse import quote
+
 import soco
+from soco.data_structures import DidlAlbum, to_didl_string
 from soco.discovery import by_name
 from soco.music_services import MusicService
 from soco.exceptions import MusicServiceAuthException
 from .config import music_service
 from .sonos_config import STATIONS, META_FORMAT_PANDORA, META_FORMAT_RADIO, \
-                         DIDL_LIBRARY_PLAYLIST, DIDL_AMAZON, DIDL_SERVICE
+                         DIDL_LIBRARY_PLAYLIST, DIDL_AMAZON, DIDL_SERVICE, DIDL_ALBUM, DIDL_TRACK, \
+                         SONOS_DIDL
 
 import re
 from unidecode import unidecode
@@ -501,42 +469,27 @@ def search_track_with_retry(track, max_retries=5):
 def search_track(track):
     results = search_track_with_retry(track)
 
-    # Include album information: Title-Artist-Album
-    titles = []
-    for t in results:
-        track_meta = t.metadata.get('track_metadata')
+    tracks = []
+    sonos_data = []
+    for track in results:
+        track_meta = track.metadata.get('track_metadata')
         if track_meta and track_meta.metadata:
             artist = track_meta.metadata.get('artist', 'Unknown Artist')
             album = track_meta.metadata.get('album', 'Unknown Album')
-            titles.append(f"{t.title}-{artist}-{album}")
+            tracks.append(f"{track.title}-{artist}-{album}")
         else:
-            titles.append(f"{t.title}-Unknown Artist-Unknown Album")
+            tracks.append(f"{track.title}-Unknown Artist-Unknown Album")
     
-    title_list = "\n".join([f"{t[0]}. {t[1]}" for t in enumerate(titles, start=1)])
-#    filename = 'sonos_search_results.pkl'
-#
-## Open the file in binary write mode ('wb')
-#    try:
-#        with open(filename, 'wb') as file:
-#            # Use pickle.dump to serialize the object and write it to the file
-#            pickle.dump(results, file)
-#
-#        return (f"Successfully pickled the search result to '{filename}'")
-#
-#    except Exception as e:
-#        return(f"An error occurred while pickling: {e}")
-#
-    track_uris = []
-    for track in results: #.items:
-        # str(track) generates the DIDL-Lite XML metadata string
-        track_uris.append(track.uri)
+        item_id = track.metadata.get('id') 
+        uri = html.escape(track.uri) # the uri typically has & which needs to be html entity escaped
+        sonos_data.append([item_id, uri])
 
-    filename = "sonos_track_uris.json"
+    filename = "sonos_data.json"
     with open(filename, 'w') as f:
-        json.dump(track_uris, f, indent=2)
+        json.dump(sonos_data, f, indent=2)
 
-    #print(f"Saved metadata for {len(tracks_metadata)} tracks to {filename}")
-    return title_list
+    track_list = "\n".join([f"{t[0]}. {t[1]}" for t in enumerate(tracks, start=1)])
+    return track_list
 
 def play_track_from_search_list(position):
     filename = "sonos_track_uris.json"
@@ -545,17 +498,126 @@ def play_track_from_search_list(position):
 
     play(True, [track_uris[position-1]]) # add
 
+def select_from_list(position):
+    filename = "sonos_data.json"
+    with open(filename, 'r') as f:
+        sonos_data = json.load(f)
+    item_id, uri = sonos_data[position-1]
+    #uri = html.escape(uri) # the uri typically has & which needs to be html entity escaped but now done in search_track
+    #Note: the id appears to be necessary for track ddl but not for album ddl
+
+    #metadata = DIDL_TRACK.format(item_id=item_id, uri=uri)
+    metadata = SONOS_DIDL.format(item_id=item_id, uri=uri)
+
+    my_add_to_queue(uri, metadata)
+
 def search_track2(track):
     results = search_track_with_retry(track)
     return results
+
+def search_album(album):
+    results = ms.search("albums", album)
+
+    albums = []
+    sonos_data = []
+    for album in results:
+        album_meta = album.metadata
+        artist = album_meta.get('artist', 'Unknown Artist')
+        title = album_meta.get('title', 'Unknown Title')
+        albums.append(f"{title} - {artist}")
+
+        # Note: for the purpose of creating the DIDL string it appears that the item_id is unnecessary
+        item_id = quote(album_meta.get('id')) # the album ids have a # although doesn't seem to need escaping   
+        sonos_data.append([item_id, album.uri])
+
+    filename = "sonos_data.json"
+    with open(filename, 'w') as f:
+        json.dump(sonos_data, f, indent=2)
+
+    album_list = "\n".join([f"{a[0]}. {a[1]}" for a in enumerate(albums, start=1)])
+    return album_list
+
+    #print(f"Found {len(album_list)} albums matching '{album}' with the following results {album_list}")
+
+    #print(to_didl_string(results[0]))
+    #item_id = quote(results[0].metadata.get('id'))
+    # not that id appears to be unnecessary for album ddl but necessary for track ddl
+
+    #metadata = DIDL_ALBUM.format(item_id=item_id, uri=results[0].uri)
+    #metadata = SONOS_DIDL.format(item_id=item_id, uri=results[0].uri)
+
+    #print(metadata)
+    #my_add_to_queue(results[0].uri, metadata)
 
 def play_album(album):
     master.stop() # not necessary but let's you know a new cmd is underway
     master.clear_queue()
     results = ms.search("albums", album)
-    master.add_to_queue(results[0])
+
+    albums = []
+    album_data = []
+    for album in results:
+        album_meta = album.metadata
+        artist = album_meta.get('artist', 'Unknown Artist')
+        title = album_meta.get('title', 'Unknown Title')
+        albums.append(f"{title} - {artist}")
+        # Note: for the purpose of creating the DIDL string it appears that the item_id is unnecessary
+        item_id = quote(album_meta.get('id')) # the album ids have a # although doesn't seem to need escaping   
+        album_data.append([item_id, album.uri])
+
+    album_list = "\n".join([f"{a[0]}. {a[1]}" for a in enumerate(albums, start=1)])
+    print(f"Found {len(album_list)} albums matching '{album}' with the following results {album_list}")
+
+    filename = "sonos_album_data.json"
+    with open(filename, 'w') as f:
+        json.dump(album_data, f, indent=2)
+
+    print(to_didl_string(results[0]))
+    item_id = quote(results[0].metadata.get('id'))
+    # not that id appears to be unnecessary for album ddl but necessary for track ddl
+
+    #metadata = DIDL_ALBUM.format(item_id=item_id, uri=results[0].uri)
+    metadata = SONOS_DIDL.format(item_id=item_id, uri=results[0].uri)
+
+    print(metadata)
+    my_add_to_queue(results[0].uri, metadata)
+    return
+    master.add_to_queue(results[0]) #this works but our problem is we are saving to disk
     master.play_from_queue(0)
-    return list_queue()
+    print(dir(results[0]))
+    print(results[0].metadata)
+    print(results[0].uri)
+    print(results[0].item_id)
+    print(to_didl_string(results[0]))
+    return
+
+    ##play(True, [results[0].uri])
+    ##play(True, [results[0].metadata.get('id')[:-11]+'?sid=201&sn=0'])
+    #master.play_from_queue(0)
+    #return list_queue()
+    #results[0].metadata["item_id"] = results[0].metadata.get('id')
+    #results[0].metadata["parent_id"] = ""
+    #del results[0].metadata["id"]
+    #del results[0].metadata["item_type"]
+    #didl_object = DidlAlbum.from_dict(results[0].metadata)
+    #didl_lite_xml = didl_object.to_xml()
+    #print(f"{didl_lite_xml=}")
+
+    #uri = results[0].uri[:-13]
+    uri = results[0].uri
+
+    i = uri.find('catalog')
+    #ii = uri.find('?'))
+    print(f"{uri=}")
+    encoded_uri = uri[i:]
+    master.add_uri_to_queue(uri)
+    return
+    #meta = DIDL_SERVICE_ALBUM.format(item_id="00032020"+encoded_uri, #that number is the sharelink "track" "key"
+    meta = DIDL_SERVICE_ALBUM.format(id_ = encoded_uri, #that number is the sharelink "track" "key"
+            #item_class = "object.item.audioItem.musicTrack",
+            item_class = "object.container.album.musicAlbum",
+            sn="51463")
+    my_add_to_queue(encoded_uri, meta)
 
 def parse_play_request(user_request: str) -> Dict[str, Any]:
 
