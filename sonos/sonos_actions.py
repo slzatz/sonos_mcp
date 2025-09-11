@@ -217,9 +217,8 @@ def play(add, uris):
                     item_class = "object.item.audioItem.musicTrack",
                     sn="51463")
             my_add_to_queue(encoded_uri, meta)
-        #elif 'static:catalog' in uri: 
         elif 'catalog' in uri: 
-            # an Amazon music track
+            # an Amazon music object (track or album)
             i = uri.find('catalog')
             ii = uri.find('?')
             encoded_uri = uri[i:ii]
@@ -263,9 +262,9 @@ def list_queue():
     response = []
     for t in queue:
         if type(t) == soco.data_structures.DidlMusicTrack:
-            response.append(f"{t.title}")
+            response.append({"title": t.title, "artist": t.creator, "album": t.album})
         else:
-            response.append(f"{t.metadata['title']} (MSTrack)")
+            response.append({"title": t.metadata['title'], "artist": "", "album": "(MSTrack)"})
     return response
 
 def clear_queue():

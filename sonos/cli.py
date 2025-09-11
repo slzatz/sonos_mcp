@@ -13,11 +13,11 @@ def bold(text):
     return "\033[1m" + text + "\033[0m"
 
 def colorize(text, color):
-    if color == "red":
+    if color == 'red':
         return "\033[31m" + text + "\033[0m"
-    elif color == "green":
+    elif color == 'green':
         return "\033[32m" + text + "\033[0m"
-    elif color == "magenta":
+    elif color == 'magenta':
         return "\033[35m" + text + "\033[0m"
     else:
         return text
@@ -162,14 +162,17 @@ def showqueue():
         return
     else:
         q = list(enumerate(lst, 1))
-        track_info = sonos_actions.current()
 
+        # below marks the currently playing track with a red music note.
+        track_info = sonos_actions.current()
         if track_info:
             cur_pos = int(track_info['playlist_position'])
-            q[cur_pos-1] = (cur_pos, colorize(q[cur_pos-1][1], 'green'))
+            q[cur_pos-1][1]['title'] =f"{colorize("🎵", 'red')}" + q[cur_pos-1][1]['title']
 
         for num,track in q:
-            click.echo(f"{num}. {track}")
+            title, artist, album = track.values()
+            s  = f"{title} - {colorize(artist, 'green')} - {colorize(album, 'red')}"
+            click.echo(f"{num}. {s}")
 
 @cli.command()
 def clearqueue():
