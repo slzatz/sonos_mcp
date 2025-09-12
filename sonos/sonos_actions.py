@@ -19,14 +19,13 @@ from soco.data_structures import DidlAlbum, to_didl_string
 from soco.discovery import by_name
 from soco.music_services import MusicService
 from soco.exceptions import MusicServiceAuthException
-from .config import music_service
+from .config import music_service, master_speaker
 from .sonos_config import STATIONS, META_FORMAT_PANDORA, META_FORMAT_RADIO, \
                          DIDL_LIBRARY_PLAYLIST, DIDL_AMAZON, DIDL_SERVICE, DIDL_ALBUM, DIDL_TRACK, \
                          SONOS_DIDL
 
 import re
 from unidecode import unidecode
-#soco_config.CACHE_ENABLED = False
 
 ms = MusicService(music_service)
  
@@ -59,20 +58,6 @@ def get_sonos_players():
     return sp    
 
 def set_master(speaker):
-#    try:
-#        ip_address(speaker)
-#    except ValueError:
-#        pass
-#    else:
-#        return soco.SoCo(speaker)
-#
-#    sps = get_sonos_players()
-#    if not sps:
-#        return None
-#
-#    sp_names = {s.player_name:s for s in sps}
-#    return sp_names.get(speaker)
-
      return by_name(speaker)
     
 def my_add_to_queue(uri, metadata):
@@ -177,7 +162,7 @@ def play(add, uris):
     # after launching program
     global master
     if master is None:
-        master = set_master("Office2")
+        master = set_master(master_speaker)
     if not master.is_coordinator:
         master.unjoin()
 
@@ -502,12 +487,9 @@ def select_from_list(position):
     with open(filename, 'r') as f:
         sonos_data = json.load(f)
     item_id, uri = sonos_data[position-1]
-    #uri = html.escape(uri) # the uri typically has & which needs to be html entity escaped but now done in search_track
+
     #Note: the id appears to be necessary for track ddl but not for album ddl
-
-    #metadata = DIDL_TRACK.format(item_id=item_id, uri=uri)
     metadata = SONOS_DIDL.format(item_id=item_id, uri=uri)
-
     my_add_to_queue(uri, metadata)
 
 def search_track2(track):

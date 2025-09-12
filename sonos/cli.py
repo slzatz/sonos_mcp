@@ -7,7 +7,7 @@ import click
 from . import sonos_actions
 from .get_lyrics import get_lyrics #uses genius.com
 import random
-from .config import speaker
+from .config import master_speaker
 
 def bold(text):
     return "\033[1m" + text + "\033[0m"
@@ -36,8 +36,8 @@ def cli(config, master, verbose):
     '''Sonos command line app; master defaults to "Office2"; verbose defaults to False '''
     config.verbose = verbose
     if not master:
-        sonos_actions.master = sonos_actions.set_master(speaker)
-        master = "Office2"
+        sonos_actions.master = sonos_actions.set_master(master_speaker)
+        #master = "Office2"
     else:
         sonos_actions.master = sonos_actions.set_master(master)
 

@@ -3,7 +3,7 @@
 import sys
 import json
 import requests
-import cloudscraper #########################
+import cloudscraper
 import re
 from .config import api_url
 
@@ -21,8 +21,6 @@ def search_db(title, artist):
     #print(f"{search_url=}; {q=}")
 
     try:
-        #response = requests.get(search_url, params={'q':q}, headers=headers)
-        #response = requests.get(search_url, params={'q':q})
         response = scraper.get(search_url, params={'q':q})
     except Exception as e:
         print(f"Exception searching db for {title} by {artist}")
