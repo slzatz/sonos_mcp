@@ -91,13 +91,6 @@ def selectm(positions):
     click.echo(msg)
 
 @cli.command()
-@click.argument('track', type=click.STRING, required=True, nargs=-1)
-def searchtrack2(track):
-    '''[search] Play a track -> sonos playtrack harvest by neil young"'''
-    msg = sonos_actions.search_track2(" ".join(track))
-    click.echo(msg)
-
-@cli.command()
 def louder():
     '''[[l]ouder] Turn the volume higher'''
     sonos_actions.turn_volume("louder")
