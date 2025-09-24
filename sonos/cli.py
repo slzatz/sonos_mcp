@@ -238,8 +238,7 @@ def playfromqueue(config, pos):
     lst = sonos_actions.list_queue()
     if 0 < pos <= len(lst):
         sonos_actions.play_from_queue(pos-1)
-        if config.verbose:
-            click.echo(f"Playing track {pos}: {lst[pos-1]}")
+        click.echo(f"Playing track {pos}: {lst[pos-1]}")
     else:
         click.echo(f"{s} is out of the range of the queue")
 

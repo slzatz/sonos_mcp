@@ -9,6 +9,7 @@ by leveraging the existing sonos CLI through Claude's function calling capabilit
 
 import os
 import sys
+import argparse
 from typing import Dict, Any, List
 import anthropic
 from anthropic import Anthropic
@@ -24,12 +25,13 @@ except ImportError:
     pass
 
 class SonosAgent:
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, verbose: bool = False):
         """
         Initialize the Sonos Claude agent.
 
         Args:
             api_key: Anthropic API key. If not provided, will look for ANTHROPIC_API_KEY env var.
+            verbose: If True, show tool calls and results during conversation.
         """
         if api_key is None:
             api_key = os.getenv('ANTHROPIC_API_KEY')
@@ -37,6 +39,7 @@ class SonosAgent:
                 raise ValueError("ANTHROPIC_API_KEY environment variable not set")
 
         self.client = Anthropic(api_key=api_key)
+        self.verbose = verbose
         self.conversation_history = []
 
     def handle_tool_call(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
@@ -54,19 +57,93 @@ class SonosAgent:
         if not tool_function:
             return f"Error: Unknown tool '{tool_name}'"
 
+        # Show tool call in verbose mode
+        if self.verbose:
+            if tool_input:
+                params = ", ".join([f"{k}={repr(v)}" for k, v in tool_input.items()])
+                print(f"🔧 [TOOL] {tool_name}({params})")
+            else:
+                print(f"🔧 [TOOL] {tool_name}()")
+
         try:
             # Call the appropriate function with the provided arguments
             if tool_name in ['search_track', 'search_album']:
                 result = tool_function(tool_input['query'])
-            elif tool_name == 'select_track':
+            elif tool_name in ['select_from_list', 'play_from_queue']:
                 result = tool_function(tool_input['position'])
             else:
                 # Tools with no parameters
                 result = tool_function()
 
+            # Show summarized result in verbose mode
+            if self.verbose and result:
+                summary = self._summarize_result(tool_name, result)
+                print(f"📋 [RESULT] {summary}")
+
             return result if result else "Command executed successfully"
         except Exception as e:
-            return f"Error executing {tool_name}: {str(e)}"
+            error_msg = f"Error executing {tool_name}: {str(e)}"
+            if self.verbose:
+                print(f"❌ [ERROR] {error_msg}")
+            return error_msg
+
+    def _summarize_result(self, tool_name: str, result: str) -> str:
+        """
+        Create a concise summary of tool results for verbose mode.
+
+        Args:
+            tool_name: Name of the tool that was executed
+            result: The full result string from the tool
+
+        Returns:
+            A summarized version of the result
+        """
+        if not result:
+            return "No output"
+
+        # Tool-specific summarization (BEFORE any truncation)
+        if tool_name in ['search_track', 'search_album']:
+            lines = result.strip().split('\n')
+            if len(lines) > 1:
+                # Count results and show first few
+                count = len(lines)
+                first_few = ', '.join([line.split('. ', 1)[1] if '. ' in line else line
+                                     for line in lines[:3] if line.strip()])
+                return f"Found {count} results: {first_few}{'...' if count > 3 else ''}"
+            # Fall through to truncation for single-line results
+
+        elif tool_name == 'show_queue':
+            lines = result.strip().split('\n')
+            # Count ALL tracks before any truncation
+            count = len([line for line in lines if line.strip() and '. ' in line])
+            if count > 0:
+                return f"Queue contains {count} tracks"
+            # Fall through to truncation if count is 0
+
+        elif tool_name == 'current_track':
+            # Keep current track info concise but informative
+            if "Nothing appears to be playing" in result:
+                return "Nothing playing"
+            return result
+
+        elif tool_name in ['play_from_queue', 'select_from_list']:
+            # Show what was selected/played
+            if '{' in result and '}' in result:
+                # Extract track info from JSON-like response
+                try:
+                    import re
+                    title_match = re.search(r"'title': '([^']*)'", result)
+                    artist_match = re.search(r"'artist': '([^']*)'", result)
+                    if title_match and artist_match:
+                        return f"'{title_match.group(1)}' by {artist_match.group(1)}"
+                except:
+                    pass
+            return result
+
+        # Default: truncate long results for tools not specifically handled above
+        if len(result) > 200:
+            return result[:200] + "..."
+        return result
 
     def chat(self, user_message: str) -> str:
         """
@@ -82,84 +159,89 @@ class SonosAgent:
         self.conversation_history.append({"role": "user", "content": user_message})
 
         try:
-            # Make the API call with tools
-            response = self.client.messages.create(
-                #model="claude-3-5-sonnet-20241022",
-                model="claude-4-sonnet-20250514",
-                max_tokens=1000,
-                system=SONOS_SYSTEM_PROMPT,
-                messages=self.conversation_history,
-                tools=SONOS_TOOLS
-            )
-
-            # Process the response
-            assistant_message = {"role": "assistant", "content": []}
-            response_text = ""
-
-            for content_block in response.content:
-                if content_block.type == "text":
-                    response_text += content_block.text
-                    assistant_message["content"].append(content_block)
-                elif content_block.type == "tool_use":
-                    # Execute the tool
-                    tool_result = self.handle_tool_call(
-                        content_block.name,
-                        content_block.input
-                    )
-
-                    # Add tool use to conversation
-                    assistant_message["content"].append(content_block)
-
-                    # Add tool result as a separate message
-                    tool_result_message = {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": content_block.id,
-                                "content": tool_result
-                            }
-                        ]
-                    }
-
-                    # Add both messages to history
-                    self.conversation_history.append(assistant_message)
-                    self.conversation_history.append(tool_result_message)
-
-                    # Get follow-up response from Claude
-                    follow_up = self.client.messages.create(
-                        model="claude-3-5-sonnet-20241022",
-                        max_tokens=1000,
-                        system=SONOS_SYSTEM_PROMPT,
-                        messages=self.conversation_history,
-                        tools=SONOS_TOOLS
-                    )
-
-                    # Return the follow-up response
-                    final_response = ""
-                    for block in follow_up.content:
-                        if block.type == "text":
-                            final_response += block.text
-
-                    # Add to conversation history
-                    self.conversation_history.append({"role": "assistant", "content": follow_up.content})
-                    return final_response
-
-            # If no tools were used, just return the text response
-            if response_text:
-                self.conversation_history.append(assistant_message)
-                return response_text
-
-            return "I'm not sure how to respond to that."
-
+            return self._process_claude_response()
         except Exception as e:
             return f"Error communicating with Claude: {str(e)}"
 
+    def _process_claude_response(self) -> str:
+        """
+        Process a Claude response, handling all tool calls properly.
+        This method recursively handles tool calls until Claude gives a final text response.
+        """
+        # Make the API call with tools
+        response = self.client.messages.create(
+            model="claude-4-sonnet-20250514",
+            max_tokens=1000,
+            system=SONOS_SYSTEM_PROMPT,
+            messages=self.conversation_history,
+            tools=SONOS_TOOLS
+        )
+
+        # Separate text and tool calls
+        text_content = []
+        tool_calls = []
+
+        for content_block in response.content:
+            if content_block.type == "text":
+                text_content.append(content_block)
+            elif content_block.type == "tool_use":
+                tool_calls.append(content_block)
+
+        # Build assistant message
+        assistant_message = {"role": "assistant", "content": response.content}
+
+        # If there are tool calls, we need to execute them and get follow-up response
+        if tool_calls:
+            # Add assistant message to history
+            self.conversation_history.append(assistant_message)
+
+            # Execute all tool calls and create tool result messages
+            for tool_call in tool_calls:
+                tool_result = self.handle_tool_call(
+                    tool_call.name,
+                    tool_call.input
+                )
+
+                # Add tool result message
+                tool_result_message = {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_call.id,
+                            "content": tool_result
+                        }
+                    ]
+                }
+                self.conversation_history.append(tool_result_message)
+
+            # Recursively process Claude's follow-up response
+            return self._process_claude_response()
+
+        else:
+            # No tool calls - this is the final response
+            self.conversation_history.append(assistant_message)
+
+            # Extract text from content blocks
+            response_text = ""
+            for block in text_content:
+                response_text += block.text
+
+            return response_text if response_text else "I'm not sure how to respond to that."
+
 def main():
     """Main function to run the Sonos agent interactively."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Sonos Claude Agent - Natural language control for Sonos speakers")
+    parser.add_argument('-v', '--verbose', action='store_true',
+                       help='Show tool calls and results during conversation')
+    args = parser.parse_args()
+
     print("🎵 Sonos Claude Agent")
     print("=" * 40)
     print("Welcome! I can help you control your Sonos speakers.")
+    if args.verbose:
+        print("🔧 Verbose mode enabled - tool calls will be shown")
     print("Try commands like:")
     print("  - 'Play some Neil Young'")
     print("  - 'What's currently playing?'")
@@ -174,7 +256,7 @@ def main():
         return
 
     try:
-        agent = SonosAgent()
+        agent = SonosAgent(verbose=args.verbose)
 
         while True:
             try:

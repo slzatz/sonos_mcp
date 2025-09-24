@@ -93,7 +93,56 @@ User Input → Claude Agent → Tool Selection → Sonos CLI → Sonos Speakers
 1. Install dependencies: `pip install -r sonos_agent/requirements.txt`
 2. Set API key: `export ANTHROPIC_API_KEY='your-key'`
 3. Run agent: `cd sonos_agent && python3 sonos_agent.py`
+4. Optional: Use verbose mode: `python3 sonos_agent.py -v` or `python3 sonos_agent.py --verbose`
 
 Requires working Sonos CLI setup and valid Anthropic API key.
+
+### Verbose Mode
+The agent supports a verbose mode that shows tool calls and results during conversations:
+
+**Normal mode:**
+```
+🎵 You: Play some Neil Young
+🤖 Assistant: I found several Neil Young songs. Which would you like?
+```
+
+**Verbose mode (`-v` flag):**
+```
+🎵 You: Play some Neil Young
+🔧 [TOOL] search_track(query='neil young')
+📋 [RESULT] Found 15 results: Heart of Gold, Old Man, Harvest Moon...
+🤖 Assistant: I found several Neil Young songs. Which would you like?
+```
+
+Verbose mode provides transparency into:
+- Which tools the agent calls and with what parameters
+- Summarized results from tool execution (search counts, track info, etc.)
+- Multi-step tool workflows (search → select → play sequences)
+- Error messages from failed tool calls
+
+### Enhanced Workflow Behavior
+The agent now follows an optimized workflow for playing specific tracks:
+
+**When you request a specific track** (e.g., "play Like a Hurricane by Neil Young"):
+1. **Search**: Finds matching tracks using `search_track`
+2. **Select**: Automatically selects the best match and adds to queue using `select_from_list`
+3. **Locate**: Uses `show_queue` to find where the track was added
+4. **Play**: Immediately starts playing from that position using `play_from_queue`
+5. **Confirm**: Reports what's now playing
+
+**Example with verbose mode:**
+```
+🎵 You: play like a hurricane by neil young
+🔧 [TOOL] search_track(query='like a hurricane neil young')
+📋 [RESULT] Found 25 results: Like a Hurricane (2003 Remaster), Like a Hurricane (Unplugged)...
+🔧 [TOOL] select_from_list(position=9)
+🔧 [TOOL] show_queue()
+📋 [RESULT] Queue contains 49 tracks
+🔧 [TOOL] play_from_queue(position=49)
+📋 [RESULT] 'Like a Hurricane' by Neil Young
+🤖 Assistant: Now playing "Like a Hurricane" by Neil Young!
+```
+
+The agent automatically executes this complete workflow without asking for permission, providing a seamless music experience.
 
 

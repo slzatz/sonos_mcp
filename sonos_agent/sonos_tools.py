@@ -41,12 +41,12 @@ def search_track(query: str) -> str:
     """
     return run_sonos_command('searchtrack', query)
 
-def select_track(position: int) -> str:
+def select_from_list(position: int) -> str:
     """
-    Select a track from the previous search results and add to queue.
+    Select a track or album from the previous search results and add to queue.
 
     Args:
-        position: The number of the track to select (1-based)
+        position: The number of the track or album to select (1-based)
 
     Returns:
         Confirmation message
@@ -110,6 +110,18 @@ def search_album(query: str) -> str:
     """
     return run_sonos_command('searchalbum', query)
 
+def play_from_queue(position: int) -> str:
+    """
+    Play a specific track from the queue by its position.
+
+    Args:
+        position: The position of the track in the queue (1-based)
+
+    Returns:
+        Confirmation message
+    """
+    return run_sonos_command('playfromqueue', str(position))
+
 # Tool definitions for Claude SDK
 SONOS_TOOLS = [
     {
@@ -127,7 +139,7 @@ SONOS_TOOLS = [
         }
     },
     {
-        "name": "select_track",
+        "name": "select_from_list",
         "description": "Select a track from search results by its number and add it to the Sonos queue.",
         "input_schema": {
             "type": "object",
@@ -135,6 +147,20 @@ SONOS_TOOLS = [
                 "position": {
                     "type": "integer",
                     "description": "The number of the track to select from the search results (1-based)"
+                }
+            },
+            "required": ["position"]
+        }
+    },
+    {
+        "name": "play_from_queue",
+        "description": "Play a track by its number in the Sonos queue.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "integer",
+                    "description": "The number of the track in the Sonos queue (1-based)"
                 }
             },
             "required": ["position"]
@@ -200,12 +226,13 @@ def get_tool_function(name: str):
     """Get the actual function for a tool by name."""
     tool_functions = {
         'search_track': search_track,
-        'select_track': select_track,
+        'select_from_list': select_from_list,
         'current_track': current_track,
         'show_queue': show_queue,
         'play_pause': play_pause,
         'next_track': next_track,
         'clear_queue': clear_queue,
-        'search_album': search_album
+        'search_album': search_album,
+        'play_from_queue': play_from_queue
     }
     return tool_functions.get(name)
