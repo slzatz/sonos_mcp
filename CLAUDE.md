@@ -93,7 +93,31 @@ User Input → Claude Agent → Tool Selection → Sonos CLI → Sonos Speakers
 1. Install dependencies: `pip install -r sonos_agent/requirements.txt`
 2. Set API key: `export ANTHROPIC_API_KEY='your-key'`
 3. Run agent: `cd sonos_agent && python3 sonos_agent.py`
+4. Optional: Use verbose mode: `python3 sonos_agent.py -v` or `python3 sonos_agent.py --verbose`
 
 Requires working Sonos CLI setup and valid Anthropic API key.
+
+### Verbose Mode
+The agent supports a verbose mode that shows tool calls and results during conversations:
+
+**Normal mode:**
+```
+🎵 You: Play some Neil Young
+🤖 Assistant: I found several Neil Young songs. Which would you like?
+```
+
+**Verbose mode (`-v` flag):**
+```
+🎵 You: Play some Neil Young
+🔧 [TOOL] search_track(query='neil young')
+📋 [RESULT] Found 15 results: Heart of Gold, Old Man, Harvest Moon...
+🤖 Assistant: I found several Neil Young songs. Which would you like?
+```
+
+Verbose mode provides transparency into:
+- Which tools the agent calls and with what parameters
+- Summarized results from tool execution (search counts, track info, etc.)
+- Multi-step tool workflows (search → select → play sequences)
+- Error messages from failed tool calls
 
 

@@ -110,6 +110,18 @@ def search_album(query: str) -> str:
     """
     return run_sonos_command('searchalbum', query)
 
+def play_from_queue(position: int) -> str:
+    """
+    Play a specific track from the queue by its position.
+
+    Args:
+        position: The position of the track in the queue (1-based)
+
+    Returns:
+        Confirmation message
+    """
+    return run_sonos_command('playfromqueue', str(position))
+
 # Tool definitions for Claude SDK
 SONOS_TOOLS = [
     {
@@ -135,6 +147,20 @@ SONOS_TOOLS = [
                 "position": {
                     "type": "integer",
                     "description": "The number of the track to select from the search results (1-based)"
+                }
+            },
+            "required": ["position"]
+        }
+    },
+    {
+        "name": "play_from_queue",
+        "description": "Play a track by its number in the Sonos queue.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "integer",
+                    "description": "The number of the track in the Sonos queue (1-based)"
                 }
             },
             "required": ["position"]
@@ -206,6 +232,7 @@ def get_tool_function(name: str):
         'play_pause': play_pause,
         'next_track': next_track,
         'clear_queue': clear_queue,
-        'search_album': search_album
+        'search_album': search_album,
+        'play_from_queue': play_from_queue
     }
     return tool_functions.get(name)
