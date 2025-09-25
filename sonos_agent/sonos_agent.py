@@ -10,7 +10,9 @@ by leveraging the existing sonos CLI through Claude's function calling capabilit
 import os
 import sys
 import argparse
-from typing import Dict, Any, List
+import logging
+from datetime import datetime
+from typing import Dict, Any, List, Optional
 import anthropic
 from anthropic import Anthropic
 
@@ -25,13 +27,14 @@ except ImportError:
     pass
 
 class SonosAgent:
-    def __init__(self, api_key: str = None, verbose: bool = False):
+    def __init__(self, api_key: str = None, verbose: bool = False, log_file: str = None):
         """
         Initialize the Sonos Claude agent.
 
         Args:
             api_key: Anthropic API key. If not provided, will look for ANTHROPIC_API_KEY env var.
             verbose: If True, show tool calls and results during conversation.
+            log_file: Path to log file for conversation logging. If None, no logging.
         """
         if api_key is None:
             api_key = os.getenv('ANTHROPIC_API_KEY')
@@ -40,7 +43,77 @@ class SonosAgent:
 
         self.client = Anthropic(api_key=api_key)
         self.verbose = verbose
+        self.log_file = log_file
+        self.logger = None
         self.conversation_history = []
+
+        # Set up logging if log file is provided
+        if log_file:
+            self._setup_logging()
+
+    def _setup_logging(self):
+        """
+        Set up logging configuration for conversation logging.
+        """
+        # Create a logger instance for this agent
+        self.logger = logging.getLogger(f'sonos_agent_{id(self)}')
+        self.logger.setLevel(logging.INFO)
+
+        # Remove any existing handlers to avoid duplicates
+        self.logger.handlers.clear()
+
+        # Create file handler with append mode
+        file_handler = logging.FileHandler(self.log_file, mode='a', encoding='utf-8')
+        file_handler.setLevel(logging.INFO)
+
+        # Create formatter
+        #formatter = logging.Formatter('%(asctime)s [%(name)s] [%(levelname)s] %(message)s',
+        formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s',
+                                    datefmt='%Y-%m-%d %H:%M:%S')
+        file_handler.setFormatter(formatter)
+
+        # Add handler to logger
+        self.logger.addHandler(file_handler)
+
+        # Log session start
+        self.logger.info("SESSION_START: Sonos Claude Agent session beginning")
+
+    def _log_user_input(self, message: str):
+        """Log user input message."""
+        if self.logger:
+            self.logger.info(f"[USER] {message}")
+
+    def _log_tool_call(self, tool_name: str, tool_input: Dict[str, Any]):
+        """Log tool call with parameters."""
+        if self.logger:
+            if tool_input:
+                params = ", ".join([f"{k}={repr(v)}" for k, v in tool_input.items()])
+                self.logger.info(f"[TOOL] {tool_name}({params})")
+            else:
+                self.logger.info(f"[TOOL] {tool_name}()")
+
+    def _log_tool_result(self, tool_name: str, result: str):
+        """Log tool execution result."""
+        if self.logger:
+            summary = self._summarize_result(tool_name, result)
+            self.logger.info(f"[RESULT] {summary}")
+
+    def _log_assistant_response(self, response: str):
+        """Log assistant response."""
+        if self.logger:
+            # Truncate very long responses for logging
+            logged_response = response[:500] + "..." if len(response) > 500 else response
+            self.logger.info(f"[ASSISTANT] {logged_response}")
+
+    def _log_error(self, error_msg: str):
+        """Log error message."""
+        if self.logger:
+            self.logger.error(f"[ERROR] {error_msg}")
+
+    def _log_session_end(self):
+        """Log session end marker."""
+        if self.logger:
+            self.logger.info("SESSION_END: Sonos Claude Agent session ending")
 
     def handle_tool_call(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
         """
@@ -56,6 +129,9 @@ class SonosAgent:
         tool_function = get_tool_function(tool_name)
         if not tool_function:
             return f"Error: Unknown tool '{tool_name}'"
+
+        # Log tool call
+        self._log_tool_call(tool_name, tool_input)
 
         # Show tool call in verbose mode
         if self.verbose:
@@ -75,6 +151,9 @@ class SonosAgent:
                 # Tools with no parameters
                 result = tool_function()
 
+            # Log tool result
+            self._log_tool_result(tool_name, result)
+
             # Show summarized result in verbose mode
             if self.verbose and result:
                 summary = self._summarize_result(tool_name, result)
@@ -83,6 +162,10 @@ class SonosAgent:
             return result if result else "Command executed successfully"
         except Exception as e:
             error_msg = f"Error executing {tool_name}: {str(e)}"
+
+            # Log error
+            self._log_error(error_msg)
+
             if self.verbose:
                 print(f"❌ [ERROR] {error_msg}")
             return error_msg
@@ -155,13 +238,21 @@ class SonosAgent:
         Returns:
             Claude's response after processing any tool calls
         """
+        # Log user input
+        self._log_user_input(user_message)
+
         # Add user message to conversation history
         self.conversation_history.append({"role": "user", "content": user_message})
 
         try:
-            return self._process_claude_response()
+            response = self._process_claude_response()
+            # Log assistant response
+            self._log_assistant_response(response)
+            return response
         except Exception as e:
-            return f"Error communicating with Claude: {str(e)}"
+            error_msg = f"Error communicating with Claude: {str(e)}"
+            self._log_error(error_msg)
+            return error_msg
 
     def _process_claude_response(self) -> str:
         """
@@ -235,6 +326,8 @@ def main():
     parser = argparse.ArgumentParser(description="Sonos Claude Agent - Natural language control for Sonos speakers")
     parser.add_argument('-v', '--verbose', action='store_true',
                        help='Show tool calls and results during conversation')
+    parser.add_argument('-l', '--log', nargs='?', const='sonos_agent.log', metavar='LOG_FILE',
+                       help='Log conversation to file (default: sonos_agent.log)')
     args = parser.parse_args()
 
     print("🎵 Sonos Claude Agent")
@@ -242,6 +335,8 @@ def main():
     print("Welcome! I can help you control your Sonos speakers.")
     if args.verbose:
         print("🔧 Verbose mode enabled - tool calls will be shown")
+    if args.log:
+        print(f"📝 Logging enabled - conversations saved to: {args.log}")
     print("Try commands like:")
     print("  - 'Play some Neil Young'")
     print("  - 'What's currently playing?'")
@@ -256,28 +351,32 @@ def main():
         return
 
     try:
-        agent = SonosAgent(verbose=args.verbose)
+        agent = SonosAgent(verbose=args.verbose, log_file=args.log)
 
-        while True:
-            try:
-                user_input = input("\n🎵 You: ").strip()
+        try:
+            while True:
+                try:
+                    user_input = input("\n🎵 You: ").strip()
 
-                if user_input.lower() in ['quit', 'exit', 'bye']:
-                    print("👋 Goodbye! Enjoy your music!")
+                    if user_input.lower() in ['quit', 'exit', 'bye']:
+                        print("👋 Goodbye! Enjoy your music!")
+                        break
+
+                    if not user_input:
+                        continue
+
+                    print("🤖 Assistant: ", end="", flush=True)
+                    response = agent.chat(user_input)
+                    print(response)
+
+                except KeyboardInterrupt:
+                    print("\n👋 Goodbye! Enjoy your music!")
                     break
-
-                if not user_input:
-                    continue
-
-                print("🤖 Assistant: ", end="", flush=True)
-                response = agent.chat(user_input)
-                print(response)
-
-            except KeyboardInterrupt:
-                print("\n👋 Goodbye! Enjoy your music!")
-                break
-            except Exception as e:
-                print(f"❌ Error: {str(e)}")
+                except Exception as e:
+                    print(f"❌ Error: {str(e)}")
+        finally:
+            # Log session end
+            agent._log_session_end()
 
     except Exception as e:
         print(f"❌ Failed to initialize agent: {str(e)}")
