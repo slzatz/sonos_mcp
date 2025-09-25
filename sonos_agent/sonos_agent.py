@@ -69,7 +69,7 @@ class SonosAgent:
             # Call the appropriate function with the provided arguments
             if tool_name in ['search_track', 'search_album']:
                 result = tool_function(tool_input['query'])
-            elif tool_name in ['select_track', 'play_from_queue']:
+            elif tool_name in ['select_from_list', 'play_from_queue']:
                 result = tool_function(tool_input['position'])
             else:
                 # Tools with no parameters
@@ -126,7 +126,7 @@ class SonosAgent:
                 return "Nothing playing"
             return result
 
-        elif tool_name in ['play_from_queue', 'select_track']:
+        elif tool_name in ['play_from_queue', 'select_from_list']:
             # Show what was selected/played
             if '{' in result and '}' in result:
                 # Extract track info from JSON-like response

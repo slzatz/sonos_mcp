@@ -120,4 +120,29 @@ Verbose mode provides transparency into:
 - Multi-step tool workflows (search → select → play sequences)
 - Error messages from failed tool calls
 
+### Enhanced Workflow Behavior
+The agent now follows an optimized workflow for playing specific tracks:
+
+**When you request a specific track** (e.g., "play Like a Hurricane by Neil Young"):
+1. **Search**: Finds matching tracks using `search_track`
+2. **Select**: Automatically selects the best match and adds to queue using `select_from_list`
+3. **Locate**: Uses `show_queue` to find where the track was added
+4. **Play**: Immediately starts playing from that position using `play_from_queue`
+5. **Confirm**: Reports what's now playing
+
+**Example with verbose mode:**
+```
+🎵 You: play like a hurricane by neil young
+🔧 [TOOL] search_track(query='like a hurricane neil young')
+📋 [RESULT] Found 25 results: Like a Hurricane (2003 Remaster), Like a Hurricane (Unplugged)...
+🔧 [TOOL] select_from_list(position=9)
+🔧 [TOOL] show_queue()
+📋 [RESULT] Queue contains 49 tracks
+🔧 [TOOL] play_from_queue(position=49)
+📋 [RESULT] 'Like a Hurricane' by Neil Young
+🤖 Assistant: Now playing "Like a Hurricane" by Neil Young!
+```
+
+The agent automatically executes this complete workflow without asking for permission, providing a seamless music experience.
+
 

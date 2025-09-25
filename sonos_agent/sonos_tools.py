@@ -41,12 +41,12 @@ def search_track(query: str) -> str:
     """
     return run_sonos_command('searchtrack', query)
 
-def select_track(position: int) -> str:
+def select_from_list(position: int) -> str:
     """
-    Select a track from the previous search results and add to queue.
+    Select a track or album from the previous search results and add to queue.
 
     Args:
-        position: The number of the track to select (1-based)
+        position: The number of the track or album to select (1-based)
 
     Returns:
         Confirmation message
@@ -139,7 +139,7 @@ SONOS_TOOLS = [
         }
     },
     {
-        "name": "select_track",
+        "name": "select_from_list",
         "description": "Select a track from search results by its number and add it to the Sonos queue.",
         "input_schema": {
             "type": "object",
@@ -226,7 +226,7 @@ def get_tool_function(name: str):
     """Get the actual function for a tool by name."""
     tool_functions = {
         'search_track': search_track,
-        'select_track': select_track,
+        'select_from_list': select_from_list,
         'current_track': current_track,
         'show_queue': show_queue,
         'play_pause': play_pause,
