@@ -332,16 +332,10 @@ def main():
 
     print("🎵 Sonos Claude Agent")
     print("=" * 40)
-    print("Welcome! I can help you control your Sonos speakers.")
     if args.verbose:
         print("🔧 Verbose mode enabled - tool calls will be shown")
     if args.log:
         print(f"📝 Logging enabled - conversations saved to: {args.log}")
-    print("Try commands like:")
-    print("  - 'Play some Neil Young'")
-    print("  - 'What's currently playing?'")
-    print("  - 'Show me the queue'")
-    print("  - 'Skip to the next song'")
     print("\nType 'quit' or 'exit' to stop.\n")
 
     # Check for API key
