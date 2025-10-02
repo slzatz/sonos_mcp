@@ -62,8 +62,15 @@ def playtrack(track):
 @cli.command()
 @click.argument('track', type=click.STRING, required=True, nargs=-1)
 def searchtrack(track):
-    '''[search] Play a track -> sonos playtrack harvest by neil young"'''
+    '''[search] search for a track that the user asks for and return a list of possible matches'''
     msg = sonos_actions.search_track(" ".join(track))
+    click.echo(msg)
+
+@cli.command()
+@click.argument('track', type=click.STRING, required=True, nargs=-1)
+def searchtrack2(track):
+    '''[search] search for a track that the user asks for and return a list of possible matches (formatted for playlist creation)'''
+    msg = sonos_actions.search_track2(" ".join(track))
     click.echo(msg)
 
 @cli.command()
@@ -73,12 +80,25 @@ def searchalbum(album):
     msg = sonos_actions.search_album(" ".join(album))
     click.echo(msg)
 
-# used by claude_music 
+@cli.command()
+@click.argument('playlist', type=click.STRING, required=True, nargs=1)
+def addplaylisttoqueue(playlist):
+    '''Add named playlist to the queue'''
+    msg = sonos_actions.add_playlist_to_queue(playlist)
+    click.echo(msg)
+
 @cli.command()
 @click.argument('position', type=int, required=True, nargs=1)
 def select(position):
     '''select a track or album from an onscreen list'''
     msg = sonos_actions.select_from_list(position)
+    click.echo(msg)
+
+@cli.command()
+@click.argument('position', type=int, required=True, nargs=1)
+def select2(position):
+    '''select a track or album from an onscreen list'''
+    msg = sonos_actions.select_from_list2(position)
     click.echo(msg)
 
 @cli.command()
@@ -218,20 +238,11 @@ def tracks(artist):
     zz = z.split(',')
     uris = [track_list[int(x)-1]['uri'] for x in zz]
     titles = [track_list[int(x)-1]['title'] for x in zz]
-    click.echo("\n".join(titles))
+    click.echo("\n".join(titles))
     sonos_actions.play(False, uris)
 
 @cli.command()
-@click.argument('album', type=click.STRING, required=True, nargs=-1)
-#@click.option('-a', '--artist', help="Artist to help find album to be played")
-#def playalbum(album, artist=None):
-def playalbum(album):
-    '''Play an album -> sonos playalbum "A man needs a maid" -a "neil young"'''
-    msg = sonos_actions.play_album(" ".join(album))
-    click.echo(msg)
-
-@cli.command()
-@click.argument('pos', type=click.INT, required=True)
+@click.argument('pos', type=click.INT, required=True, nargs=1)
 @pass_config
 def playfromqueue(config, pos):
     '''[playq] Play track from queue position - top of list is position #1'''
@@ -241,6 +252,20 @@ def playfromqueue(config, pos):
         click.echo(f"Playing track {pos}: {lst[pos-1]}")
     else:
         click.echo(f"{s} is out of the range of the queue")
+
+@cli.command()
+@click.argument('playlist', type=str)
+@click.argument('position', type=int)
+def playlistq(playlist, position):
+    msg = sonos_actions.select_from_queue_for_playlist(playlist, position)
+    click.echo(msg)
+
+@cli.command()
+@click.argument('playlist', type=str)
+@click.argument('position', type=int)
+def playlists(playlist, position):
+    msg = sonos_actions.select_from_search_for_playlist(playlist, position)
+    click.echo(msg)
 
 @cli.command()
 @click.argument('user_request', type=str, required=True, nargs=-1)

@@ -10,9 +10,10 @@ import sys
 import random
 from operator import itemgetter 
 from typing import Optional, Dict, Any, List, Tuple
+from pathlib import Path
 
 import html
-from urllib.parse import quote
+from urllib.parse import urlparse, quote, unquote
 
 import soco
 from soco.data_structures import DidlAlbum, to_didl_string
@@ -475,6 +476,29 @@ def search_track(track):
     track_list = "\n".join([f"{t[0]}. {t[1]}" for t in enumerate(tracks, start=1)])
     return track_list
 
+def search_track2(track):
+    results = search_track_with_retry(track)
+
+    tracks = []
+    for track in results:
+        track_meta = track.metadata.get('track_metadata')
+        if track_meta and track_meta.metadata:
+            artist = track_meta.metadata.get('artist', 'Unknown Artist')
+            album = track_meta.metadata.get('album', 'Unknown Album')
+            item_id = track.metadata.get('id') 
+            uri = html.escape(track.uri) # the uri typically has & which needs to be html entity escaped
+            tracks.append({"title":track.title, "artist":artist, "album":album, "item_id":item_id, "uri":uri})
+        else:
+            uri = html.escape(track.uri) # the uri typically has & which needs to be html entity escaped
+            tracks.append({"title":track.title, "artist":"Unknown Artist", "album":"Unknown Album", "item_id":"Unknown item_id", "uri":uri})
+    
+    filename = "sonos_data2.json"
+    with open(filename, 'w') as f:
+        json.dump(tracks, f, indent=2)
+
+    track_list = "\n".join([f"{t[0]}. {"-".join(list(t[1].values())[:3])}" for t in enumerate(tracks, start=1)])
+    return track_list
+
 def play_track_from_search_list(position):
     filename = "sonos_track_uris.json"
     with open(filename, 'r') as f:
@@ -486,11 +510,22 @@ def select_from_list(position):
     filename = "sonos_data.json"
     with open(filename, 'r') as f:
         sonos_data = json.load(f)
+
     item_id, uri = sonos_data[position-1]
 
     #Note: the id appears to be necessary for track ddl but not for album ddl
     metadata = SONOS_DIDL.format(item_id=item_id, uri=uri)
     my_add_to_queue(uri, metadata)
+
+def select_from_list2(position):
+    filename = "sonos_data2.json"
+    with open(filename, 'r') as f:
+        sonos_data = json.load(f)
+
+    t = sonos_data[position-1]
+    #Note: the id appears to be necessary for track ddl but not for album ddl
+    metadata = SONOS_DIDL.format(item_id=t['item_id'], uri=t['uri'])
+    my_add_to_queue(t['uri'], metadata)
 
 def search_album(album):
     results = ms.search("albums", album)
@@ -511,88 +546,83 @@ def search_album(album):
     with open(filename, 'w') as f:
         json.dump(sonos_data, f, indent=2)
 
+    # Use the returned list to select an album to play and use its position in list to select from the sonos_data.json file
     album_list = "\n".join([f"{a[0]}. {a[1]}" for a in enumerate(albums, start=1)])
     return album_list
 
-    #print(f"Found {len(album_list)} albums matching '{album}' with the following results {album_list}")
+def select_from_queue_for_playlist(playlist, position):
+    #queue = list_queue()
+    queue = master.get_queue()
+    if 0 < position <= len(queue):
+        track = queue[position-1]
+        #title, artist, album = track.values()
+    else:
+        return f"{position} is out of the range of the queue"
 
-    #print(to_didl_string(results[0]))
-    #item_id = quote(results[0].metadata.get('id'))
-    # not that id appears to be unnecessary for album ddl but necessary for track ddl
+    uri = track.get_uri()
+    unquoted_uri = unquote(uri)
+    parsed_uri = urlparse(unquoted_uri)
+    path = parsed_uri.path
+    directory_path = os.path.dirname(path) + "/"
+    uri = f"soco://0fffffff{directory_path}?sid=201&amp;sn=0"
 
-    #metadata = DIDL_ALBUM.format(item_id=item_id, uri=results[0].uri)
-    #metadata = SONOS_DIDL.format(item_id=item_id, uri=results[0].uri)
+    filename = playlist
+    file_path = Path.home() / "sonos_cli" / "playlists" / filename
 
-    #print(metadata)
-    #my_add_to_queue(results[0].uri, metadata)
+    if file_path.is_file():
+        with file_path.open('r') as file:
+            data = json.load(file)
 
-def play_album(album):
-    master.stop() # not necessary but let's you know a new cmd is underway
-    master.clear_queue()
-    results = ms.search("albums", album)
+        data.append({"title": track.title, "artist": track.creator, "album": track.album, "item_id": directory_path, "uri": uri})
+        with file_path.open('w') as file:
+            json.dump(data, file, indent=2)
+    else:
+      file_path.parent.mkdir(parents=True, exist_ok=True)
+      data = [{"title": track.title, "artist": track.creator, "album": track.album, "item_id": directory_path, "uri": uri}]
+      with file_path.open('w') as file:
+        json.dump(data, file, indent=2)
 
-    albums = []
-    album_data = []
-    for album in results:
-        album_meta = album.metadata
-        artist = album_meta.get('artist', 'Unknown Artist')
-        title = album_meta.get('title', 'Unknown Title')
-        albums.append(f"{title} - {artist}")
-        # Note: for the purpose of creating the DIDL string it appears that the item_id is unnecessary
-        item_id = quote(album_meta.get('id')) # the album ids have a # although doesn't seem to need escaping   
-        album_data.append([item_id, album.uri])
+    return f"Selected track {position}: {track.title} by {track.creator} from the queue and added to playlist {playlist}"
 
-    album_list = "\n".join([f"{a[0]}. {a[1]}" for a in enumerate(albums, start=1)])
-    print(f"Found {len(album_list)} albums matching '{album}' with the following results {album_list}")
+def select_from_search_for_playlist(playlist, position):
+    filename = "sonos_data2.json"
+    with open(filename, 'r') as f:
+        sonos_data = json.load(f)
 
-    filename = "sonos_album_data.json"
-    with open(filename, 'w') as f:
-        json.dump(album_data, f, indent=2)
+    d = sonos_data[position-1]
 
-    print(to_didl_string(results[0]))
-    item_id = quote(results[0].metadata.get('id'))
-    # not that id appears to be unnecessary for album ddl but necessary for track ddl
+    filename = playlist
+    file_path = Path.home() / "sonos_cli" / "playlists" / filename
 
-    #metadata = DIDL_ALBUM.format(item_id=item_id, uri=results[0].uri)
-    metadata = SONOS_DIDL.format(item_id=item_id, uri=results[0].uri)
+    if file_path.is_file():
+        with file_path.open('r') as file:
+            data = json.load(file)
 
-    print(metadata)
-    my_add_to_queue(results[0].uri, metadata)
-    return
-    master.add_to_queue(results[0]) #this works but our problem is we are saving to disk
-    master.play_from_queue(0)
-    print(dir(results[0]))
-    print(results[0].metadata)
-    print(results[0].uri)
-    print(results[0].item_id)
-    print(to_didl_string(results[0]))
-    return
+        data.append(d)
+        with file_path.open('w') as file:
+            json.dump(data, file, indent=2)
+    else:
+      file_path.parent.mkdir(parents=True, exist_ok=True)
+      data = [d]
+      with file_path.open('w') as file:
+        json.dump(data, file, indent=2)
 
-    ##play(True, [results[0].uri])
-    ##play(True, [results[0].metadata.get('id')[:-11]+'?sid=201&sn=0'])
-    #master.play_from_queue(0)
-    #return list_queue()
-    #results[0].metadata["item_id"] = results[0].metadata.get('id')
-    #results[0].metadata["parent_id"] = ""
-    #del results[0].metadata["id"]
-    #del results[0].metadata["item_type"]
-    #didl_object = DidlAlbum.from_dict(results[0].metadata)
-    #didl_lite_xml = didl_object.to_xml()
-    #print(f"{didl_lite_xml=}")
+    return f"Selected track {position}: {d["title"]} by {d["artist"]} from the search and added to playlist {playlist}"
 
-    #uri = results[0].uri[:-13]
-    uri = results[0].uri
+def add_playlist_to_queue(playlist):
+    filename = playlist
+    file_path = Path.home() / "sonos_cli" / "playlists" / filename
 
-    i = uri.find('catalog')
-    #ii = uri.find('?'))
-    print(f"{uri=}")
-    encoded_uri = uri[i:]
-    master.add_uri_to_queue(uri)
-    return
-    #meta = DIDL_SERVICE_ALBUM.format(item_id="00032020"+encoded_uri, #that number is the sharelink "track" "key"
-    meta = DIDL_SERVICE_ALBUM.format(id_ = encoded_uri, #that number is the sharelink "track" "key"
-            #item_class = "object.item.audioItem.musicTrack",
-            item_class = "object.container.album.musicAlbum",
-            sn="51463")
-    my_add_to_queue(encoded_uri, meta)
+    if not file_path.is_file():
+        return f"Playlist {playlist} does not exist"
 
+    with file_path.open('r') as file:
+        tracks = json.load(file)
+
+    for t in tracks:
+        #Note: the id appears to be necessary for track ddl but not for album ddl
+        metadata = SONOS_DIDL.format(item_id=t['item_id'], uri=t['uri'])
+        my_add_to_queue(t['uri'], metadata)
+
+
+    return f"Added {len(tracks)} tracks from playlist {playlist} to the queue"
