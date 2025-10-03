@@ -44,26 +44,87 @@ def cli(config, master, verbose):
     if verbose:
         click.echo(f"Master speaker is {master}: {sonos_actions.master.ip_address}")
 
-@cli.command()
-@click.argument('station', default="wnyc", required=False)
-def playstation(station):
-    """Play a station (currently a pandora station (eg 'Neil Young') or 'wnyc'
-    The default is 'wnyc'"""
-    sonos_actions.play_station(station)
+@click.group()
+def search():
+    '''Search for a track or album'''
+    pass
 
-@cli.command()
-@click.argument('track', type=click.STRING, required=True, nargs=-1)
-def playtrack(track):
-    '''[play] Play a track -> sonos playtrack harvest by neil young"'''
-    msg = sonos_actions.play_track(" ".join(track))
+cli.add_command(search)
+
+@search.command()
+@click.argument('title', type=click.STRING, required=True, nargs=-1)
+def track(title):
+    '''
+    Search for a track and return a list of possible matches
+
+    TITLE: The name of the track to search for.
+    '''
+    msg = sonos_actions.search_for_track(" ".join(title))
     click.echo(msg)
 
-# used by claude_music 
-@cli.command()
-@click.argument('track', type=click.STRING, required=True, nargs=-1)
-def searchtrack(track):
-    '''[search] search for a track that the user asks for and return a list of possible matches'''
-    msg = sonos_actions.search_track(" ".join(track))
+@search.command()
+@click.argument('title', type=click.STRING, required=True, nargs=-1)
+def album(title):
+    '''
+    Search for an album and return a list of possible matches
+
+    TITLE: The name of the album to search for.
+    '''
+    msg = sonos_actions.search_for_album(" ".join(title))
+    click.echo(msg)
+
+@click.group()
+def addtoqueue():
+    '''Add tracks or album to the queue'''
+    pass
+
+cli.add_command(addtoqueue)
+
+@addtoqueue.command()
+@click.argument('position', type=int, required=True, nargs=1)
+def album(position):
+    '''select an  album from an onscreen list'''
+    msg = sonos_actions.add_album_to_queue(position)
+    click.echo(msg)
+
+@addtoqueue.command()
+@click.argument('position', type=int, required=True, nargs=1)
+def track(position):
+    '''select a track from an onscreen list'''
+    msg = sonos_actions.add_track_to_queue(position)
+    click.echo(msg)
+
+@click.group()
+def addtoplaylist():
+    '''Add tracks to a playlist'''
+    pass
+
+cli.add_command(addtoplaylist)
+
+@addtoplaylist.command()
+@click.argument('playlist', type=str)
+@click.argument('position', type=int)
+def queue(playlist, position):
+    '''
+    Add a track to a PLAYLIST by its POSITION in the queue
+
+    PLAYLIST: The name of the playlist to add the track to.
+    POSITION: The numeric position of the track in the current queue.
+    '''
+    msg = sonos_actions.add_to_playlist_from_queue(playlist, position)
+    click.echo(msg)
+
+@addtoplaylist.command()
+@click.argument('playlist', type=str)
+@click.argument('position', type=int)
+def search(playlist, position):
+    '''
+    Add a track to a PLAYLIST by its POSITION in search results
+
+    PLAYLIST: The name of the playlist to add the track to.
+    POSITION: The numeric position of the track in the current queue.
+    '''
+    msg = sonos_actions.add_to_playlist_from_search(playlist, position)
     click.echo(msg)
 
 @cli.command()
@@ -85,20 +146,6 @@ def searchalbum(album):
 def addplaylisttoqueue(playlist):
     '''Add named playlist to the queue'''
     msg = sonos_actions.add_playlist_to_queue(playlist)
-    click.echo(msg)
-
-@cli.command()
-@click.argument('position', type=int, required=True, nargs=1)
-def select(position):
-    '''select a track or album from an onscreen list'''
-    msg = sonos_actions.select_from_list(position)
-    click.echo(msg)
-
-@cli.command()
-@click.argument('position', type=int, required=True, nargs=1)
-def select2(position):
-    '''select a track or album from an onscreen list'''
-    msg = sonos_actions.select_from_list2(position)
     click.echo(msg)
 
 @cli.command()
@@ -252,21 +299,6 @@ def playfromqueue(config, pos):
         click.echo(f"Playing track {pos}: {lst[pos-1]}")
     else:
         click.echo(f"{s} is out of the range of the queue")
-
-@cli.command()
-@click.argument('playlist', type=str)
-@click.argument('position', type=int)
-def playlistq(playlist, position):
-    msg = sonos_actions.select_from_queue_for_playlist(playlist, position)
-    click.echo(msg)
-
-@cli.command()
-@click.argument('playlist', type=str)
-@click.argument('position', type=int)
-def playlists(playlist, position):
-    msg = sonos_actions.select_from_search_for_playlist(playlist, position)
-    click.echo(msg)
-
 @cli.command()
 @click.argument('user_request', type=str, required=True, nargs=-1)
 def smartplay(user_request):
@@ -279,3 +311,18 @@ def smartplay(user_request):
     sonos_actions.play_track_from_search_list(position)
     click.echo(parsed_results[position-1])
     click.echo(title+artist)
+
+@cli.command()
+@click.argument('station', default="wnyc", required=False)
+def playstation(station):
+    """Play a station (currently a pandora station (eg 'Neil Young') or 'wnyc'
+    The default is 'wnyc'"""
+    sonos_actions.play_station(station)
+
+@cli.command()
+@click.argument('track', type=click.STRING, required=True, nargs=-1)
+def playtrack(track):
+    '''[play] Play a track -> sonos playtrack harvest by neil young"'''
+    msg = sonos_actions.play_track(" ".join(track))
+    click.echo(msg)
+

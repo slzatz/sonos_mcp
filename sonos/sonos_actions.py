@@ -476,7 +476,7 @@ def search_track(track):
     track_list = "\n".join([f"{t[0]}. {t[1]}" for t in enumerate(tracks, start=1)])
     return track_list
 
-def search_track2(track):
+def search_for_track(track):
     results = search_track_with_retry(track)
 
     tracks = []
@@ -506,7 +506,7 @@ def play_track_from_search_list(position):
 
     play(True, [track_uris[position-1]]) # add
 
-def select_from_list(position):
+def add_album_to_queue(position):
     filename = "sonos_data.json"
     with open(filename, 'r') as f:
         sonos_data = json.load(f)
@@ -517,7 +517,7 @@ def select_from_list(position):
     metadata = SONOS_DIDL.format(item_id=item_id, uri=uri)
     my_add_to_queue(uri, metadata)
 
-def select_from_list2(position):
+def add_track_to_queue(position):
     filename = "sonos_data2.json"
     with open(filename, 'r') as f:
         sonos_data = json.load(f)
@@ -527,7 +527,7 @@ def select_from_list2(position):
     metadata = SONOS_DIDL.format(item_id=t['item_id'], uri=t['uri'])
     my_add_to_queue(t['uri'], metadata)
 
-def search_album(album):
+def search_for_album(album):
     results = ms.search("albums", album)
 
     albums = []
@@ -550,7 +550,7 @@ def search_album(album):
     album_list = "\n".join([f"{a[0]}. {a[1]}" for a in enumerate(albums, start=1)])
     return album_list
 
-def select_from_queue_for_playlist(playlist, position):
+def add_to_playlist_from_queue(playlist, position):
     #queue = list_queue()
     queue = master.get_queue()
     if 0 < position <= len(queue):
@@ -584,7 +584,7 @@ def select_from_queue_for_playlist(playlist, position):
 
     return f"Selected track {position}: {track.title} by {track.creator} from the queue and added to playlist {playlist}"
 
-def select_from_search_for_playlist(playlist, position):
+def add_to_playlist_from_search(playlist, position):
     filename = "sonos_data2.json"
     with open(filename, 'r') as f:
         sonos_data = json.load(f)
