@@ -143,10 +143,14 @@ class SonosAgent:
 
         try:
             # Call the appropriate function with the provided arguments
-            if tool_name in ['search_track', 'search_album']:
+            if tool_name in ['search_for_track', 'search_for_album']:
                 result = tool_function(tool_input['query'])
-            elif tool_name in ['select_from_list', 'play_from_queue']:
+            elif tool_name in ['add_playlist_to_queue']:
+                result = tool_function(tool_input['playlist'])
+            elif tool_name in ['add_track_to_queue', 'add_album_to_queue', 'play_from_queue']:
                 result = tool_function(tool_input['position'])
+            elif tool_name in ['add_to_playlist_from_search', 'add_to_playlist_from_queue']:
+                result = tool_function(tool_input['playlist'], tool_input['position'])
             else:
                 # Tools with no parameters
                 result = tool_function()
@@ -185,7 +189,7 @@ class SonosAgent:
             return "No output"
 
         # Tool-specific summarization (BEFORE any truncation)
-        if tool_name in ['search_track', 'search_album']:
+        if tool_name in ['search_for_track', 'search_for_album']:
             lines = result.strip().split('\n')
             if len(lines) > 1:
                 # Count results and show first few
@@ -209,7 +213,7 @@ class SonosAgent:
                 return "Nothing playing"
             return result
 
-        elif tool_name in ['play_from_queue', 'select_from_list']:
+        elif tool_name in ['play_from_queue', 'add_track_to_queue', 'add_album_to_queue']:
             # Show what was selected/played
             if '{' in result and '}' in result:
                 # Extract track info from JSON-like response

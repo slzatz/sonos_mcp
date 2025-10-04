@@ -141,6 +141,7 @@ def unjoin():
     for s in master.group.members:
         s.unjoin()
 
+# playq sonos playfromqueue
 def play_from_queue(pos):
     try:
         master.play_from_queue(pos)

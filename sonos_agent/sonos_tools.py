@@ -29,7 +29,7 @@ def run_sonos_command(command: str, *args: str) -> str:
         error_msg = f"Sonos command failed: {' '.join(cmd)}\nError: {e.stderr}"
         raise Exception(error_msg)
 
-def search_track(query: str) -> str:
+def search_for_track(query: str) -> str:
     """
     Search for tracks matching the query.
 
@@ -39,19 +39,81 @@ def search_track(query: str) -> str:
     Returns:
         Formatted list of tracks with numbers for selection
     """
-    return run_sonos_command('searchtrack', query)
+    return run_sonos_command('search-for-track', query)
 
-def select_from_list(position: int) -> str:
+def search_for_album(query: str) -> str:
     """
-    Select a track or album from the previous search results and add to queue.
+    Search for albums matching the query.
 
     Args:
-        position: The number of the track or album to select (1-based)
+        query: Search term (e.g., "harvest by neil young")
+
+    Returns:
+        Formatted list of album with numbers for selection
+    """
+    return run_sonos_command('search-for-album', query)
+
+def add_track_to_queue(position: int) -> str:
+    """
+    Select a track from the previous search results and add it to queue.
+
+    Args:
+        position: The number of the track to select (1-based)
 
     Returns:
         Confirmation message
     """
-    return run_sonos_command('select', str(position))
+    return run_sonos_command('add-track-to-queue', str(position))
+
+def add_album_to_queue(position: int) -> str:
+    """
+    Select an album from the previous search results and add it to queue.
+
+    Args:
+        position: The number of the album to select (1-based)
+
+    Returns:
+        Confirmation message
+    """
+    return run_sonos_command('add-album-to-queue', str(position))
+
+def add_to_playlist_from_queue(playlist: str, position: int) -> str:
+    """
+    Select a track from the queue and add it to the specified playlist.
+
+    Args:
+        playlist: The name of the playlist
+        position: The number of the album to select (1-based)
+
+    Returns:
+        Confirmation message
+    """
+    return run_sonos_command('add-to-playlist-from-queue', playlist, str(position))
+
+def add_to_playlist_from_search(playlist: str, position: int) -> str:
+    """
+    Select a track from the most recent search and add it to the specified playlist.
+
+    Args:
+        playlist: The name of the playlist
+        position: The number of the album to select (1-based)
+
+    Returns:
+        Confirmation message
+    """
+    return run_sonos_command('add-to-playlist-from-search', playlist, str(position))
+
+def add_playlist_to_queue(playlist: str) -> str:
+    """
+    Search for albums matching the query.
+
+    Args:
+        query: The name of the playlist
+
+    Returns:
+        Formatted list of album with numbers for selection
+    """
+    return run_sonos_command('add-playlist-to-queue', playlist)
 
 def current_track() -> str:
     """
@@ -69,7 +131,7 @@ def show_queue() -> str:
     Returns:
         Formatted list of tracks in the queue
     """
-    return run_sonos_command('showqueue')
+    return run_sonos_command('show-queue')
 
 def play_pause() -> str:
     """
@@ -96,19 +158,7 @@ def clear_queue() -> str:
     Returns:
         Confirmation message
     """
-    return run_sonos_command('clearqueue')
-
-def search_album(query: str) -> str:
-    """
-    Search for albums matching the query.
-
-    Args:
-        query: Album search term
-
-    Returns:
-        Formatted list of albums with numbers for selection
-    """
-    return run_sonos_command('searchalbum', query)
+    return run_sonos_command('clear-queue')
 
 def play_from_queue(position: int) -> str:
     """
@@ -120,12 +170,12 @@ def play_from_queue(position: int) -> str:
     Returns:
         Confirmation message
     """
-    return run_sonos_command('playfromqueue', str(position))
+    return run_sonos_command('play-from-queue', str(position))
 
 # Tool definitions for Claude SDK
 SONOS_TOOLS = [
     {
-        "name": "search_track",
+        "name": "search_for_track",
         "description": "Search for music tracks by title, artist, or both. Returns a numbered list of matching tracks.",
         "input_schema": {
             "type": "object",
@@ -139,7 +189,7 @@ SONOS_TOOLS = [
         }
     },
     {
-        "name": "select_from_list",
+        "name": "add_track_to_queue",
         "description": "Select a track from search results by its number and add it to the Sonos queue.",
         "input_schema": {
             "type": "object",
@@ -150,6 +200,70 @@ SONOS_TOOLS = [
                 }
             },
             "required": ["position"]
+        }
+    },
+    {
+        "name": "add_album_to_queue",
+        "description": "Select an album from search results by its number and add it to the Sonos queue.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "integer",
+                    "description": "The number of the album to select from the search results (1-based)"
+                }
+            },
+            "required": ["position"]
+        }
+    },
+    {
+        "name": "add_to_playlist_from_queue",
+        "description": "Select a track from the Sonos queue by its number and add it to the specified playlist.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "playlist": {
+                    "type": "string",
+                    "description": "The name of the playlist to add the track to"
+                },
+                "position": {
+                    "type": "integer",
+                    "description": "The number of the track to select from the queue (1-based)"
+                }
+            },
+            "required": ["playlist", "position"]
+        }
+    },
+    {
+        "name": "add_to_playlist_from_search",
+        "description": "Select a track from search by its number and add it to the specified playlist.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "playlist": {
+                    "type": "string",
+                    "description": "The name of the playlist to add the track to"
+                },
+                "position": {
+                    "type": "integer",
+                    "description": "The number of the track to select from the search results (1-based)"
+                }
+            },
+            "required": ["playlist", "position"]
+        }
+    },
+    {
+        "name": "add_playlist_to_queue",
+        "description": "Add a named playlist to the Sonos queue.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "playlist": {
+                    "type": "string",
+                    "description": "The name of the playlist to add to the queue"
+                }
+            },
+            "required": ["playlist"]
         }
     },
     {
@@ -207,7 +321,7 @@ SONOS_TOOLS = [
         }
     },
     {
-        "name": "search_album",
+        "name": "search_for_album",
         "description": "Search for music albums by title or artist. Returns a numbered list of matching albums.",
         "input_schema": {
             "type": "object",
@@ -225,14 +339,18 @@ SONOS_TOOLS = [
 def get_tool_function(name: str):
     """Get the actual function for a tool by name."""
     tool_functions = {
-        'search_track': search_track,
-        'select_from_list': select_from_list,
+        'search_for_track': search_for_track,
+        'search_for_album': search_for_album,
+        'add_track_to_queue': add_track_to_queue,
+        'add_album_to_queue': add_album_to_queue,
+        'add_to_playlist_from_queue': add_to_playlist_from_queue,
+        'add_to_playlist_from_search': add_to_playlist_from_search,
+        'add_playlist_to_queue': add_playlist_to_queue,
         'current_track': current_track,
         'show_queue': show_queue,
         'play_pause': play_pause,
         'next_track': next_track,
         'clear_queue': clear_queue,
-        'search_album': search_album,
         'play_from_queue': play_from_queue
     }
     return tool_functions.get(name)
