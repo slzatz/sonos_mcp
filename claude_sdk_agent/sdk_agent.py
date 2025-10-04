@@ -72,7 +72,9 @@ class SonosSDKAgent:
                 "mcp__sonos__list_queue",
                 "mcp__sonos__play_pause",
                 "mcp__sonos__next_track",
-                "mcp__sonos__clear_queue"
+                "mcp__sonos__clear_queue",
+                "mcp__sonos__list_playlist_tracks",
+                "mcp__sonos__remove_track_from_playlist"
             ],
             system_prompt=SONOS_SYSTEM_PROMPT,
             # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)

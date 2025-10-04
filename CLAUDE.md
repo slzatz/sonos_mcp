@@ -80,26 +80,34 @@ Standard implementation using the Anthropic Python SDK directly.
 **Model:** Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
 
 ### 2. Claude Agent SDK Implementation (claude_sdk_agent/)
-Proof-of-concept rewrite using the official Claude Agent SDK. Provides the same functionality with 30% less code and additional features like session resumption.
+Production-ready rewrite using the official Claude Agent SDK with direct Python function calls for optimal performance.
 
 **Location:**
 - **claude_sdk_agent/**: SDK-based agent implementation
   - **sdk_agent.py**: Main agent using ClaudeSDKClient (265 lines)
-  - **sonos_mcp_tools.py**: Tools defined with @tool decorator
-  - **system_prompt.py**: Same music domain prompt
+  - **sonos_mcp_tools.py**: MCP tools using direct Python imports (no subprocess overhead)
+  - **system_prompt.py**: Comprehensive music domain prompt with workflow examples
   - **requirements.txt**: Dependencies (claude-agent-sdk)
   - **README.md**: SDK-specific documentation
   - **USAGE.md**: Quick start guide
+  - **REFACTORING_PLAN.md**: Documentation of CLI-to-direct-call refactoring
 
 **Model:** Claude Sonnet 4.5 (uses Claude Code CLI default)
 
 **Key Advantages:**
-- 30% less code (265 vs 383 lines in main agent)
-- Session resumption: resume by ID (`-r SESSION_ID`) or continue most recent (`-c`)
-- Automatic conversation management via ClaudeSDKClient
-- Cleaner tool definitions using `@tool` decorator
-- Built-in MCP server architecture
-- Support for interrupts and hooks (future enhancements)
+- **~100x faster performance**: Direct Python function calls instead of subprocess CLI wrappers
+- **30% less code**: 265 vs 383 lines in main agent
+- **Session resumption**: Resume by ID (`-r SESSION_ID`) or continue most recent (`-c`)
+- **Robust initialization**: Retry logic for flaky SoCo speaker discovery (up to 10 attempts)
+- **Playlist management**: View and edit saved playlists with dedicated tools
+- **Automatic conversation management**: Via ClaudeSDKClient
+- **Cleaner tool definitions**: Using `@tool` decorator and MCP server architecture
+
+**Available Tools (15 total):**
+- Search: `search_for_track`, `search_for_album`
+- Queue Management: `add_track_to_queue`, `add_album_to_queue`, `list_queue`, `clear_queue`, `play_from_queue`
+- Playlist Management: `add_to_playlist_from_queue`, `add_to_playlist_from_search`, `add_playlist_to_queue`, `list_playlist_tracks`, `remove_track_from_playlist`
+- Playback Control: `current_track`, `play_pause`, `next_track`
 
 **Usage:**
 ```bash
@@ -126,13 +134,30 @@ Both agents provide natural language control over Sonos through conversational c
 - "Show me the queue" → displays current music queue
 - "Skip to the next song" → controls playback
 
+**SDK Agent Additional Features:**
+- "What's in my favorites playlist?" → shows all tracks in saved playlist
+- "Remove track 5 from favorites" → removes specific track from playlist
+- "Add the current track to my workout playlist" → adds track to playlist from queue
+- Playlists stored as JSON in `~/.sonos/playlists/<playlist_name>`
+
 ### Architecture
+
+**Original Agent:**
 ```
-User Input → Claude Agent → Tool Selection → Sonos CLI → Sonos Speakers
+User Input → Claude Agent → Tool Selection → Sonos CLI (subprocess) → Sonos Speakers
 ```
-- Uses Claude's function calling to execute appropriate Sonos CLI commands
-- Maintains conversation context for multi-step music workflows
-- Handles search, selection, playback, and queue management
+
+**SDK Agent (Refactored):**
+```
+User Input → Claude Agent → Tool Selection → sonos_actions.py (direct import) → Sonos Speakers
+```
+
+Key architectural differences:
+- **Original**: Uses subprocess calls to `sonos` CLI commands (slower but isolated)
+- **SDK Agent**: Direct Python imports from `sonos.sonos_actions` (~100x faster, shared state)
+- Both use Claude's function calling to execute appropriate Sonos operations
+- Both maintain conversation context for multi-step music workflows
+- Both handle search, selection, playback, queue management, and playlists
 
 ### Setup
 
