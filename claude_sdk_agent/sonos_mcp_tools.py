@@ -186,13 +186,13 @@ async def current_track(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @tool(
-    "show_queue",
+    "list_queue",
     "Display the current Sonos queue showing all queued tracks.",
     {}
 )
-async def show_queue(args: Dict[str, Any]) -> Dict[str, Any]:
+async def list_queue(args: Dict[str, Any]) -> Dict[str, Any]:
     """Show the current queue."""
-    result = run_sonos_command('show-queue')
+    result = run_sonos_command('list-queue')
     return {
         "content": [{
             "type": "text",
@@ -270,7 +270,7 @@ def create_sonos_mcp_server():
             add_playlist_to_queue,
             play_from_queue,
             current_track,
-            show_queue,
+            list_queue,
             play_pause,
             next_track,
             clear_queue

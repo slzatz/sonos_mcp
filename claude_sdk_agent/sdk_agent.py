@@ -69,7 +69,7 @@ class SonosSDKAgent:
                 "mcp__sonos__add_playlist_to_queue",
                 "mcp__sonos__play_from_queue",
                 "mcp__sonos__current_track",
-                "mcp__sonos__show_queue",
+                "mcp__sonos__list_queue",
                 "mcp__sonos__play_pause",
                 "mcp__sonos__next_track",
                 "mcp__sonos__clear_queue"

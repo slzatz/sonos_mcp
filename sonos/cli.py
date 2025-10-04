@@ -202,7 +202,7 @@ def what():
         click.secho("Nothing appears to be playing! ", nl=False, fg='red', bold=True)
 
 @cli.command()
-def show_queue():
+def list_queue():
     '''[showq] Show the queue and the currently playing track'''
     lst = sonos_actions.list_queue()
     if not lst:
@@ -248,46 +248,6 @@ def shuffle(artists):
     artists.replace('\\', '') # added 07092023 but also have to add unidecode to sonos_actions2.py shuffle 
     msg = sonos_actions.shuffle(artists)
     click.echo(msg)
-
-@cli.command()
-@click.argument('artist', type=click.STRING, required=True, nargs=-1)
-def tracks(artist):
-    '''List the tracks from an artist'''
-    artist = " ".join(artist)
-    result = sonos_actions.list_(artist)
-    count = len(result)
-    msg = ""
-    if count:
-        msg += f"Track count for {artist.title()} was {count}:\n"
-        track_list = result.docs
-    else:
-        msg += f"I couldn't find any tracks for {artist.title()}\n"
-        return
-    titles = [t.get('title', '')+'-'+t.get('artist', '') for t in track_list]
-    title_list = "\n".join([f"{t[0]}. {t[1]}" for t in enumerate(titles, start=1)])
-    msg += title_list
-    click.echo(msg)
-    z = input("Which tracks? ")
-    if not z:
-        return
-    zz = z.split(',')
-    uris = [track_list[int(x)-1]['uri'] for x in zz]
-    titles = [track_list[int(x)-1]['title'] for x in zz]
-    click.echo("\n".join(titles))
-    sonos_actions.play(False, uris)
-
-@cli.command()
-@click.argument('user_request', type=str, required=True, nargs=-1)
-def smartplay(user_request):
-    '''"smartplay burgundy shoes by patty griffin" '''
-    # note the title and artist are not "cleaned" - that happens later
-    title, artist, preferences = sonos_actions.parse_play_request(" ".join(user_request)).values()
-    d = sonos_actions.generate_query_and_do_search(title, artist, preferences)
-    parsed_results = sonos_actions.parse_search_results(d["results"])
-    position = sonos_actions.intelligent_match_selection(parsed_results, d["title"], d["artist"], d["preferences"])
-    sonos_actions.play_track_from_search_list(position)
-    click.echo(parsed_results[position-1])
-    click.echo(title+artist)
 
 @cli.command()
 @click.argument('station', default="wnyc", required=False)
