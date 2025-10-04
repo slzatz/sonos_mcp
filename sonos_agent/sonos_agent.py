@@ -265,7 +265,7 @@ class SonosAgent:
         """
         # Make the API call with tools
         response = self.client.messages.create(
-            model="claude-4-sonnet-20250514",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=1000,
             system=SONOS_SYSTEM_PROMPT,
             messages=self.conversation_history,

@@ -61,21 +61,66 @@ The main Sonos actions are implemented in `sonos_actions.py` and include:
 
 Note that these functions are called by the CLI commands defined in `cli.py` and the correspondence between CLI command and sonos_actions functions is straightforward.  For example, the cli command `sonos searchtrack` calls `sonos_actions.search_track()` and the cli command `sonos playfromqueue` calls `sonos_actions.play_from_queue()`.
 
-## Sonos Claude Agent
+## Sonos Claude Agents
 
-A natural language interface for controlling Sonos speakers using the Anthropic Claude SDK. This agent wraps the existing Sonos CLI commands to provide conversational music control.
+Natural language interfaces for controlling Sonos speakers using Claude AI. Two implementations are available:
 
-### Location
-- **sonos_agent/**: Claude agent implementation directory
-  - **sonos_agent.py**: Main interactive agent application
+### 1. Original Agent (sonos_agent/)
+Standard implementation using the Anthropic Python SDK directly.
+
+**Location:**
+- **sonos_agent/**: Original agent implementation
+  - **sonos_agent.py**: Main interactive agent application (383 lines)
   - **sonos_tools.py**: CLI wrapper functions for Claude tools
   - **system_prompt.py**: Music domain system prompt for Claude
   - **test_tools.py**: Tool functionality verification script
-  - **requirements.txt**: Claude SDK dependencies
+  - **requirements.txt**: Dependencies (anthropic SDK)
   - **README.md**: Detailed agent documentation
 
-### Usage
-The agent provides natural language control over Sonos through conversational commands:
+**Model:** Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+
+### 2. Claude Agent SDK Implementation (claude_sdk_agent/)
+Proof-of-concept rewrite using the official Claude Agent SDK. Provides the same functionality with 30% less code and additional features like session resumption.
+
+**Location:**
+- **claude_sdk_agent/**: SDK-based agent implementation
+  - **sdk_agent.py**: Main agent using ClaudeSDKClient (265 lines)
+  - **sonos_mcp_tools.py**: Tools defined with @tool decorator
+  - **system_prompt.py**: Same music domain prompt
+  - **requirements.txt**: Dependencies (claude-agent-sdk)
+  - **README.md**: SDK-specific documentation
+  - **USAGE.md**: Quick start guide
+
+**Model:** Claude Sonnet 4.5 (uses Claude Code CLI default)
+
+**Key Advantages:**
+- 30% less code (265 vs 383 lines in main agent)
+- Session resumption: resume by ID (`-r SESSION_ID`) or continue most recent (`-c`)
+- Automatic conversation management via ClaudeSDKClient
+- Cleaner tool definitions using `@tool` decorator
+- Built-in MCP server architecture
+- Support for interrupts and hooks (future enhancements)
+
+**Usage:**
+```bash
+cd claude_sdk_agent
+
+# Basic usage
+python3 sdk_agent.py
+
+# Resume a specific session
+python3 sdk_agent.py -r abc123def456
+
+# Continue most recent session
+python3 sdk_agent.py -c
+
+# With verbose mode and logging
+python3 sdk_agent.py -v -l session.log
+```
+
+### Common Features (Both Agents)
+
+Both agents provide natural language control over Sonos through conversational commands:
 - "Play some Neil Young" → searches and plays music
 - "What's currently playing?" → shows track information
 - "Show me the queue" → displays current music queue
@@ -90,12 +135,21 @@ User Input → Claude Agent → Tool Selection → Sonos CLI → Sonos Speakers
 - Handles search, selection, playback, and queue management
 
 ### Setup
+
+**Original Agent:**
 1. Install dependencies: `pip install -r sonos_agent/requirements.txt`
 2. Set API key: `export ANTHROPIC_API_KEY='your-key'`
-3. Run agent: `cd sonos_agent && python3 sonos_agent.py`
-4. Optional: Use verbose mode: `python3 sonos_agent.py -v` or `python3 sonos_agent.py --verbose`
+3. Run: `cd sonos_agent && python3 sonos_agent.py`
+4. Optional flags: `-v` (verbose), `-l` (logging)
 
-Requires working Sonos CLI setup and valid Anthropic API key.
+**SDK Agent:**
+1. Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+2. Install dependencies: `pip install -r claude_sdk_agent/requirements.txt`
+3. Set API key: `export ANTHROPIC_API_KEY='your-key'`
+4. Run: `cd claude_sdk_agent && python3 sdk_agent.py`
+5. Optional flags: `-v` (verbose), `-l` (logging), `-r SESSION_ID` (resume), `-c` (continue)
+
+Both require working Sonos CLI setup and valid Anthropic API key.
 
 ### Verbose Mode
 The agent supports a verbose mode that shows tool calls and results during conversations:
