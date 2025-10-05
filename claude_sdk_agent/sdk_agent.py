@@ -17,6 +17,7 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
 
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ToolUseBlock, ResultMessage
 
@@ -92,7 +93,9 @@ class SonosSDKAgent:
         self.logger.setLevel(logging.INFO)
         self.logger.handlers.clear()
 
-        file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+        file_path = Path.home() / ".sonos" / "logs" / log_file
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(file_path, mode='a', encoding='utf-8')
         file_handler.setLevel(logging.INFO)
 
         formatter = logging.Formatter(
@@ -148,7 +151,7 @@ class SonosSDKAgent:
                     self.session_id = message.session_id
 
             # Log assistant response
-            self._log("INFO", f"[ASSISTANT] {response_text[:500]}{'...' if len(response_text) > 500 else ''}")
+            self._log("INFO", f"[ASSISTANT] {response_text[:1500]}{'...' if len(response_text) > 1500 else ''}")
 
             return response_text if response_text else "I'm not sure how to respond to that."
 

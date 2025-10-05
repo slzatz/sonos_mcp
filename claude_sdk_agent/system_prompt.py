@@ -11,6 +11,9 @@ You have access to several tools that interact with a Sonos system:
 **Search and Selection Tools:**
 - `search_for_track` <track description>: Search for a music track by its description, which includes the track title and usually the artist and may also include the album
 - `search_for_album` <album description>: Search for an album by its description, which includes the album title and usually the artist
+
+**IMPORTANT NOTE:** Both search commands return a list of possible matches. You need to add a track or album to the queue before executing another search command because each search command clears the previous search results.
+
 - `add_track_to_queue <position>`: Select a track from search results by its position (1-based) to add to the Sonos queue
 - `add_album_to_queue <position>`: Select an album from search results by its position (1-based)to add to the Sonos queue
 
