@@ -147,7 +147,9 @@ class SonosSDKAgent:
                             print(f"🔧 [TOOL] {tool_name}({params})")
                             self._log("INFO", f"[TOOL] {tool_name}({params})")
                 elif isinstance(message, ResultMessage):
-                    # Capture session ID from result message
+                    # Capture session ID from result message and log if first time
+                    if message.session_id and not self.session_id:
+                        self._log("INFO", f"[SESSION_ID] {message.session_id}")
                     self.session_id = message.session_id
 
             # Log assistant response
@@ -166,6 +168,8 @@ class SonosSDKAgent:
 
     async def stop(self):
         """Disconnect from Claude and cleanup."""
+        if self.session_id:
+            self._log("INFO", f"[SESSION_ID] {self.session_id} (resume with -r {self.session_id})")
         self._log("INFO", "SESSION_END: Sonos Claude SDK Agent session ending")
         await self.client.disconnect()
 
