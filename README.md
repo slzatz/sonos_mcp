@@ -46,7 +46,7 @@ Here's what's in your **favorites** - 8 tracks total:
 That's a really nice mix! You've got some great singer-songwriters (Ani, Patty Griffin, Aimee Mann), a beautiful live Neil Young track, and even some Keith Jarrett jazz. Would you like me to add this playlist to your queue and start playing it?
 
 🎵 You: Can you play Love in Mind from that playlist?   
-🤖 Assistant: 🔧 [TOOL] add_playlist_to_queue(playlist='test_playlist')   
+🤖 Assistant: 🔧 [TOOL] add_playlist_to_queue(playlist='favorites')   
 🔧 [TOOL] list_queue()   
 🔧 [TOOL] play_from_queue(position=19)   
 🔧 [TOOL] current_track()   
