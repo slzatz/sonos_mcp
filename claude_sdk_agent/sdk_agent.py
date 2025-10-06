@@ -1,4 +1,4 @@
-#!/home/slzatz/sonos_cli/.venv/bin/python3
+#!/home/slzatz/sonos_mcp/.venv/bin/python3
 
 """
 Sonos Claude SDK Agent - A natural language interface using Claude Agent SDK.
@@ -22,7 +22,6 @@ from pathlib import Path
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ToolUseBlock, ResultMessage
 
 # Import our local modules
-from sonos_mcp_tools import create_sonos_mcp_server
 from system_prompt import SONOS_SYSTEM_PROMPT
 
 try:
@@ -54,26 +53,40 @@ class SonosSDKAgent:
         self.verbose = verbose
         self.session_id = None  # Will be set after first interaction
 
-        # Create the Sonos MCP server
-        sonos_server = create_sonos_mcp_server()
+        # Configure external Sonos MCP server (stdio transport)
+        project_root = Path(__file__).parent.parent
+        server_path = project_root / "sonos_mcp_server" / "server.py"
+        venv_python = project_root / ".venv" / "bin" / "python3"
 
         # Configure Claude Agent options
         self.options = ClaudeAgentOptions(
-            mcp_servers={"sonos": sonos_server},
+            mcp_servers={
+                "sonos": {
+                    "command": str(venv_python),
+                    "args": [str(server_path)]
+                }
+            },
             allowed_tools=[
+                # Speaker management
+                "mcp__sonos__get_master_speaker",
+                "mcp__sonos__set_master_speaker",
+                # Music search
                 "mcp__sonos__search_for_track",
                 "mcp__sonos__search_for_album",
+                # Queue management
                 "mcp__sonos__add_track_to_queue",
                 "mcp__sonos__add_album_to_queue",
+                "mcp__sonos__list_queue",
+                "mcp__sonos__clear_queue",
+                "mcp__sonos__play_from_queue",
+                # Playback control
+                "mcp__sonos__current_track",
+                "mcp__sonos__play_pause",
+                "mcp__sonos__next_track",
+                # Playlist management
                 "mcp__sonos__add_to_playlist_from_queue",
                 "mcp__sonos__add_to_playlist_from_search",
                 "mcp__sonos__add_playlist_to_queue",
-                "mcp__sonos__play_from_queue",
-                "mcp__sonos__current_track",
-                "mcp__sonos__list_queue",
-                "mcp__sonos__play_pause",
-                "mcp__sonos__next_track",
-                "mcp__sonos__clear_queue",
                 "mcp__sonos__list_playlist_tracks",
                 "mcp__sonos__remove_track_from_playlist"
             ],

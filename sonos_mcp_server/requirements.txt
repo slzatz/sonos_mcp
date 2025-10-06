@@ -1,0 +1,5 @@
+# MCP Server Dependencies
+mcp[cli]>=1.2.0
+
+# Note: Sonos-related dependencies (soco, etc.) are inherited from parent project
+# The server imports from ../sonos which has its own dependencies in ../pyproject.toml

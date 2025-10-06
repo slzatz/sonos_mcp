@@ -1,12 +1,14 @@
 [project]
-name = "sonos-cli"
+name = "sonos_mcp"
 version = "0.1.0"
 description = "cli tool for controlling Sonos speakers"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "claude-agent-sdk>=0.1.0",
     "click>=8.2.1",
     "cloudscraper>=1.2.71",
+    "python-dotenv>=1.1.1",
     "soco>=0.30.11",
     "unidecode>=1.4.0",
 ]
