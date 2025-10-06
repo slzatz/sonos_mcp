@@ -45,28 +45,29 @@ Here's what's in your **favorites** - 8 tracks total:
 
 That's a really nice mix! You've got some great singer-songwriters (Ani, Patty Griffin, Aimee Mann), a beautiful live Neil Young track, and even some Keith Jarrett jazz. Would you like me to add this playlist to your queue and start playing it?
 
-🎵 You: Can you play Love in Mind from that playlist?
-🤖 Assistant: 🔧 [TOOL] add_playlist_to_queue(playlist='test_playlist')
-🔧 [TOOL] list_queue()
-🔧 [TOOL] play_from_queue(position=19)
-🔧 [TOOL] current_track()
+🎵 You: Can you play Love in Mind from that playlist?   
+🤖 Assistant: 🔧 [TOOL] add_playlist_to_queue(playlist='test_playlist')   
+🔧 [TOOL] list_queue()   
+🔧 [TOOL] play_from_queue(position=19)   
+🔧 [TOOL] current_track()   
 
 Perfect! I've started playing **Love in Mind (Live at Royce Hall, Los Angeles, California, 1/30/1971)** by Neil Young from the *Time Fades Away* album.
 This is such a beautiful live track - one of Neil's most vulnerable performances. The *Time Fades Away* album is legendary for capturing that raw, emotionally intense period of his 1973 tour. Enjoy!
 
 Another example:
 
-🎵 You: Can you find some live versions of songs from Neil Young, Patty Griffin and Bruce Springsteen and add them to the queue?
-🤖 Assistant: 🔧 [TOOL] search_for_track(query='Neil Young live')
-🔧 [TOOL] add_track_to_queue(position=2) [*Note: the positions are the position of the chosen track in the search results*]
-🔧 [TOOL] add_track_to_queue(position=5)
-🔧 [TOOL] search_for_track(query='Patty Griffin live')
-🔧 [TOOL] add_track_to_queue(position=7)
-🔧 [TOOL] add_track_to_queue(position=1)
-🔧 [TOOL] search_for_track(query='Bruce Springsteen live')
-🔧 [TOOL] add_track_to_queue(position=5)
-🔧 [TOOL] add_track_to_queue(position=11)
-🔧 [TOOL] list_queue()
+🎵 You: Can you find some live versions of songs from Neil Young, Patty Griffin and Bruce Springsteen and add them to the queue?   
+🤖 Assistant: 🔧 [TOOL] search_for_track(query='Neil Young live')   
+🔧 [TOOL] add_track_to_queue(position=2) [*Note: the positions are the position of the chosen track in the search results*]   
+🔧 [TOOL] add_track_to_queue(position=5)   
+🔧 [TOOL] search_for_track(query='Patty Griffin live')   
+🔧 [TOOL] add_track_to_queue(position=7)   
+🔧 [TOOL] add_track_to_queue(position=1)   
+🔧 [TOOL] search_for_track(query='Bruce Springsteen live')   
+🔧 [TOOL] add_track_to_queue(position=5)   
+🔧 [TOOL] add_track_to_queue(position=11)   
+🔧 [TOOL] list_queue()   
+
 I'll find some great live tracks from Neil Young, Patty Griffin, and Bruce Springsteen and add them to your queue!  Perfect! I've added 6 great live tracks to your queue from all three artists:
 
 **Neil Young:**
