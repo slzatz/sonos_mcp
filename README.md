@@ -1,10 +1,14 @@
 # An mcp and agent to interact with Sonos speakers
 
-The sonos mcp utilizaes the SoCo python package. The mcp tools include:  
+The sonos mcp utilizes the SoCo python package and the functions that the mcp uses are all in sonos_actions.py. The mcp tools include:  
 
 ### Speaker management
 - get_master_speaker
 - set_master_speaker
+### Volume control
+- turn_volume
+- set_volume
+- mute
 ### Music search
 - search_for_track
 - search_for_album
@@ -22,6 +26,7 @@ The sonos mcp utilizaes the SoCo python package. The mcp tools include:
 - add_to_playlist_from_queue
 - add_to_playlist_from_search
 - add_playlist_to_queue
+- list_playlists
 - list_playlist_tracks
 - remove_track_from_playlist
 

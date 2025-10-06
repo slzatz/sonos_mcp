@@ -223,6 +223,57 @@ async def next_track() -> str:
         return f"Failed to skip track: {str(e)}"
 
 
+# Volume Control Tools
+
+@mcp.tool()
+async def turn_volume(direction: str) -> str:
+    """
+    Adjust volume up or down by 10 for all speakers in the group.
+
+    Args:
+        direction: "louder" to increase volume, "quieter" to decrease volume
+    """
+    try:
+        sonos_actions.turn_volume(direction)
+        change = "increased" if direction != "quieter" else "decreased"
+        return f"Volume {change} by 10"
+    except Exception as e:
+        return f"Failed to adjust volume: {str(e)}"
+
+
+@mcp.tool()
+async def set_volume(level: int) -> str:
+    """
+    Set the absolute volume level for all speakers in the group.
+
+    Args:
+        level: Volume level from 0 (muted) to 100 (maximum)
+    """
+    try:
+        if level < 0 or level > 100:
+            return "Volume level must be between 0 and 100"
+        sonos_actions.set_volume(level)
+        return f"Volume set to {level}"
+    except Exception as e:
+        return f"Failed to set volume: {str(e)}"
+
+
+@mcp.tool()
+async def mute(muted: bool) -> str:
+    """
+    Mute or unmute all speakers in the group.
+
+    Args:
+        muted: True to mute, False to unmute
+    """
+    try:
+        sonos_actions.mute(muted)
+        status = "muted" if muted else "unmuted"
+        return f"Speakers {status}"
+    except Exception as e:
+        return f"Failed to change mute status: {str(e)}"
+
+
 # Playlist Management Tools
 
 @mcp.tool()
@@ -270,6 +321,19 @@ async def add_playlist_to_queue(playlist: str) -> str:
         return result
     except Exception as e:
         return f"Failed to add playlist to queue: {str(e)}"
+
+
+@mcp.tool()
+async def list_playlists() -> str:
+    """
+    List all available playlists.
+    Returns a numbered list of all saved playlists.
+    """
+    try:
+        result = sonos_actions.list_playlists()
+        return result
+    except Exception as e:
+        return f"Failed to list playlists: {str(e)}"
 
 
 @mcp.tool()

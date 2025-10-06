@@ -9,28 +9,6 @@ This is a **standalone MCP server** that runs as a separate process and communic
 - Claude Desktop
 - Any other MCP-compatible client
 
-### Key Differences from In-Process Tools
-
-**Previous Architecture (In-Process):**
-```
-Agent → create_sdk_mcp_server() → @tool functions → sonos_actions
-(Everything in same Python process)
-```
-
-**New Architecture (Standalone Server):**
-```
-sonos_mcp_server/server.py (separate process)
-    ↓ stdio transport (JSON-RPC)
-Agent/Client (connects via MCP protocol)
-```
-
-**Benefits:**
-- ✅ True client/server separation
-- ✅ Can be used by multiple MCP clients (Claude Desktop, custom agents, etc.)
-- ✅ Can be long-running to reduce startup overhead
-- ✅ Better isolation and error handling
-- ✅ Follows MCP specification exactly
-
 ## Installation
 
 ### 1. Install Dependencies
@@ -44,7 +22,7 @@ Note: The server also requires the parent `sonos` module dependencies (soco, etc
 
 ### 2. Configure Master Speaker
 
-The server uses the master speaker setting from `../sonos/config.py`. Make sure `master_speaker` is configured correctly:
+The server uses the master speaker setting from `../sonos/config.py`.
 
 ```python
 # In sonos/config.py
@@ -79,6 +57,11 @@ The Claude SDK Agent (`claude_sdk_agent/sdk_agent.py`) is configured to auto-lau
 - `get_master_speaker` - Get current master speaker name
 - `set_master_speaker` - Change to a different Sonos speaker
 
+### Volume control
+- `turn_volume` - Increase/decrease volume
+- `set_volume` - Set specific volume level
+- `mute` - Mute/unmute speaker
+
 ### Music Search (2 tools)
 - `search_for_track` - Search for tracks by title/artist
 - `search_for_album` - Search for albums by title/artist
@@ -99,6 +82,7 @@ The Claude SDK Agent (`claude_sdk_agent/sdk_agent.py`) is configured to auto-lau
 - `add_to_playlist_from_queue` - Add track from queue to playlist
 - `add_to_playlist_from_search` - Add track from search to playlist
 - `add_playlist_to_queue` - Add entire playlist to queue
+- `list_playlists` - Show all playlists
 - `list_playlist_tracks` - Show all tracks in a playlist
 - `remove_track_from_playlist` - Remove track from playlist
 
@@ -153,25 +137,11 @@ This provides a web UI for testing all tools.
 
 ## Usage Examples
 
-### With Claude Agent SDK
-
-```bash
-cd claude_sdk_agent
-python3 sdk_agent.py
-```
-
-Then interact naturally:
-- "Play some Neil Young"
+- "Play some early Neil Young"
+- "Create a playlist of tracks from Bruce Springsteen, Tom Petty, and Jason Isbell"
 - "What's currently playing?"
 - "Add track 3 to my favorites playlist"
-- "Switch to the bedroom speaker"
-
-### With Claude Desktop
-
-After configuration, just chat with Claude:
-- "Show me what's in the queue"
-- "Search for Harvest Moon by Neil Young"
-- "Add album 1 to the queue and play it"
+- "Find a live version of Patty Griffin's Making Pies"
 
 ## Architecture Details
 
@@ -222,64 +192,6 @@ All logging goes to **stderr** (required for stdio transport):
 - Tool execution (in verbose mode)
 - Errors and warnings
 
-Never writes to stdout (would corrupt MCP protocol).
-
-## Troubleshooting
-
-### Server won't start
-
-**Check speaker connection:**
-```bash
-# Run server manually to see connection attempts
-python3 server.py
-```
-
-**Verify master speaker name:**
-```python
-# In sonos/config.py
-master_speaker = "Exact Speaker Name"  # Case-sensitive
-```
-
-### Agent can't connect to server
-
-**Check server path:**
-```python
-# Make sure path is absolute
-server_path = "/full/absolute/path/to/sonos_mcp_server/server.py"
-```
-
-**Test with MCP Inspector:**
-```bash
-npx @modelcontextprotocol/inspector python3 /path/to/server.py
-```
-
-### Tools not appearing
-
-**Check allowed_tools list:**
-```python
-allowed_tools=[
-    "mcp__sonos__search_for_track",  # Must include mcp__sonos__ prefix
-    "mcp__sonos__play_from_queue",
-    # ... etc
-]
-```
-
-### Speaker discovery failing
-
-**Common causes:**
-- Speaker name doesn't match exactly
-- Speaker is off or not on network
-- Network connectivity issues
-- SoCo discovery timeout
-
-**Fix:**
-```python
-# Increase retry attempts in server.py
-sonos_actions.master = initialize_speaker(max_retries=20)
-```
-
-## Development
-
 ### Adding New Tools
 
 1. Add the function to `sonos/sonos_actions.py`
@@ -329,15 +241,6 @@ cd claude_sdk_agent
 python3 sdk_agent.py -v  # Verbose mode shows tool calls
 ```
 
-## Migration from In-Process Tools
-
-If migrating from the old `sonos_mcp_tools.py` approach:
-
-1. ✅ New standalone server is already created
-2. ✅ Agent is already updated to use external server
-3. ✅ Old `sonos_mcp_tools.py` has been removed
-4. ⚠️ Update any other agents/clients to use new server config
-
 ## Related Documentation
 
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
@@ -347,4 +250,3 @@ If migrating from the old `sonos_mcp_tools.py` approach:
 
 ## License
 
-Same as parent project.

@@ -7,9 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A comprehensive Sonos speaker control system with natural language interface using Claude AI. The project provides both programmatic Python APIs and an AI-powered conversational agent for controlling Sonos speakers through the Model Context Protocol (MCP).
 
 **Key Features:**
-- Natural language control: "Play Heart of Gold by Neil Young"
+- Natural language control: "Play Heart of Gold by Neil Young", "Turn it up", "Show my playlists"
 - Music search across Amazon Music
 - Queue and playlist management
+- Volume control (adjust, set level, mute/unmute)
 - Multi-speaker support with dynamic speaker switching
 - Session resumption for continuous conversations
 - MCP server compatible with Claude Desktop and other MCP clients
@@ -49,7 +50,7 @@ sonos_mcp/
 │   └── cli.py                  # Legacy CLI (not used by agent)
 │
 ├── sonos_mcp_server/           # Standalone MCP Server
-│   ├── server.py               # FastMCP server with 17 tools
+│   ├── server.py               # FastMCP server with 21 tools
 │   ├── requirements.txt        # MCP SDK dependencies
 │   ├── __init__.py
 │   └── README.md               # Server documentation
@@ -77,8 +78,9 @@ sonos_mcp/
   - Music search (tracks, albums)
   - Queue management (add, remove, play, clear)
   - Playback control (play/pause, next, current track)
-  - Playlist management (load, save, edit)
+  - Playlist management (list, load, save, edit)
   - Speaker management (get/set master speaker)
+  - Volume control (adjust, set level, mute/unmute)
 
 - **`config.py`**: User configuration (gitignored, user-created)
   ```python
@@ -107,7 +109,7 @@ sonos_mcp/
 - Runs as separate process (launched by agent)
 - Auto-exits when client disconnects
 
-**Available Tools (17 total):**
+**Available Tools (21 total):**
 
 *Speaker Management (2 tools):*
 - `get_master_speaker` - Get current master speaker name
@@ -129,7 +131,13 @@ sonos_mcp/
 - `play_pause` - Toggle play/pause
 - `next_track` - Skip to next track
 
-*Playlist Management (5 tools):*
+*Volume Control (3 tools):*
+- `turn_volume` - Adjust volume by 10 (louder/quieter)
+- `set_volume` - Set absolute volume level (0-100)
+- `mute` - Mute or unmute all speakers in group
+
+*Playlist Management (6 tools):*
+- `list_playlists` - Display all available playlists
 - `add_to_playlist_from_queue` - Add track from queue to playlist
 - `add_to_playlist_from_search` - Add track from search to playlist
 - `add_playlist_to_queue` - Load entire playlist to queue
@@ -257,9 +265,27 @@ python3 sdk_agent.py -v -l debug.log
 
 **Playlist operations:**
 ```
+🎵 You: What playlists do I have?
+🔧 [TOOL] list_playlists()
+🤖 Assistant: Available playlists (3):
+1. favorites
+2. workout
+3. chill
+
 🎵 You: Add track 2 from the queue to my favorites playlist
 🔧 [TOOL] add_to_playlist_from_queue(playlist='favorites', position=2)
 🤖 Assistant: Added "Old Man" by Neil Young to your favorites playlist!
+```
+
+**Volume control:**
+```
+🎵 You: Turn it up
+🔧 [TOOL] turn_volume(direction='louder')
+🤖 Assistant: Volume increased by 10
+
+🎵 You: Set volume to 40
+🔧 [TOOL] set_volume(level=40)
+🤖 Assistant: Volume set to 40
 ```
 
 **Speaker management:**
@@ -561,4 +587,4 @@ Should show all Sonos speakers on network.
 - MCP Inspector (for testing)
 - Any MCP-compatible client
 
-All 17 tools are functional and tested end-to-end.
+All 21 tools are functional and tested end-to-end.

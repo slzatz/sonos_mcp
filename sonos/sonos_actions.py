@@ -342,6 +342,26 @@ def add_playlist_to_queue(playlist):
 
     return f"Added {len(tracks)} tracks from playlist {playlist} to the queue"
 
+def list_playlists():
+    """
+    List all available playlists.
+    Returns a formatted string with playlist names.
+    """
+    playlists_dir = Path.home() / ".sonos" / "playlists"
+
+    if not playlists_dir.exists():
+        return "No playlists directory found. Create a playlist first!"
+
+    playlist_files = [f.name for f in playlists_dir.iterdir() if f.is_file()]
+
+    if not playlist_files:
+        return "No playlists found. Create a playlist first!"
+
+    playlist_files.sort()
+    playlist_list = "\n".join([f"{i}. {name}" for i, name in enumerate(playlist_files, start=1)])
+
+    return f"Available playlists ({len(playlist_files)}):\n{playlist_list}"
+
 #### below here not currently in use ####
 def shuffle(artists):
     master.stop() # not necessary but let's you know a new cmd is underway
