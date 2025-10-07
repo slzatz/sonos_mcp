@@ -101,5 +101,5 @@ These tracks are now at the end of your queue (positions 20-25). Would you like 
 
 ----------------------------
 
-**Note:** You can use instructions in the system prompt to guide how wordy and sycophantic/enthusiastic the agent will be.  For the moment, I am enjoying its commentary and energy but the instructions can be changed to suit the style of agent you'd prefer. The system prompt continues some of the scenarios that the agent is intended to manage. 
+**Note:** You can use instructions in the system prompt to guide how wordy and sycophantic, enthusiastic etc. the agent will be.  For the moment, I am enjoying its commentary and energy but the instructions can be changed to suit the style of agent you'd prefer. The system prompt contains s summary of the tools that the agent has access to as well as some example scenarios that the agent is intended to manage. 
 
