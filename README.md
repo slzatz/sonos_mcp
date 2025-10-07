@@ -1,6 +1,8 @@
 # An mcp and agent to interact with Sonos speakers
 
-The sonos mcp utilizes the SoCo python package and the functions that the mcp uses are all in sonos_actions.py. The mcp tools include:  
+The sonos mcp coupled with the sonos_agent allows control of the Sonos system through natural language interactioins with an LLM that leverages the ability of an LLM to use and sequence tools to accomplish a request and also takes advantage of the music-related information that the model was trained on.  The agent utilizes the claude agent sdk and the mcp uses the SoCo python package.
+
+The MCPs available functions are:
 
 ### Speaker management
 - get_master_speaker
@@ -30,12 +32,20 @@ The sonos mcp utilizes the SoCo python package and the functions that the mcp us
 - list_playlist_tracks
 - remove_track_from_playlist
 
-There is an agent based on the Claude Agent SDK that uses the sonos mcp to interact with the sonos system.
+The sonos agent has access to all the functions (tools) and decides how to use them to accomplish the user's requests.
+
+The agent has a number of optional command line arguments:
+
+- --verbose (-v): show the tool calls the agent is making
+- --log (-l): enable logging of interactions and tool calls to the specified log file
+- --prompt: run in headless mode using the prompt provided on the command line
+- --resume (-r): resume a previous conversation from the session id (recorded to screen and log file)
+- --continue-conversation (-c): continue the previous conversation
 
 With verbose mode you can see the tool calls that the agent is making.  For example:
 
-🎵 You: What's in playlist favorites
-🤖 Assistant: 🔧 [TOOL] list_playlist_tracks(playlist='favorites')
+🎵 You: What's in playlist favorites   
+🤖 Assistant: 🔧 [TOOL] list_playlist_tracks(playlist='favorites')  
 
 Here's what's in your **favorites** - 8 tracks total:
 
@@ -51,7 +61,7 @@ Here's what's in your **favorites** - 8 tracks total:
 That's a really nice mix! You've got some great singer-songwriters (Ani, Patty Griffin, Aimee Mann), a beautiful live Neil Young track, and even some Keith Jarrett jazz. Would you like me to add this playlist to your queue and start playing it?
 
 🎵 You: Can you play Love in Mind from that playlist?   
-🤖 Assistant: 🔧 [TOOL] add_playlist_to_queue(playlist='favorites')   
+🤖 Assistant: 🔧 [TOOL] add_playlist_to_queue(playlist='favorites')    
 🔧 [TOOL] list_queue()   
 🔧 [TOOL] play_from_queue(position=19)   
 🔧 [TOOL] current_track()   
@@ -89,5 +99,7 @@ I'll find some great live tracks from Neil Young, Patty Griffin, and Bruce Sprin
 
 These tracks are now at the end of your queue (positions 20-25). Would you like me to start playing them now, or are you happy with what's currently playing?
 
-**Note:** You can use instructions in the system prompt to guide how wordy and sycophantic/enyhusiastic the agent will be.  For the moment, I am enjoying its commentary and enthusiasm but you have control over that.
+----------------------------
+
+**Note:** You can use instructions in the system prompt to guide how wordy and sycophantic/enthusiastic the agent will be.  For the moment, I am enjoying its commentary and energy but the instructions can be changed to suit the style of agent you'd prefer. The system prompt continues some of the scenarios that the agent is intended to manage. 
 

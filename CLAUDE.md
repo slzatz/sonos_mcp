@@ -13,6 +13,7 @@ A comprehensive Sonos speaker control system with natural language interface usi
 - Volume control (adjust, set level, mute/unmute)
 - Multi-speaker support with dynamic speaker switching
 - Session resumption for continuous conversations
+- Headless mode for one-off commands and scripting
 - MCP server compatible with Claude Desktop and other MCP clients
 
 ## Architecture
@@ -156,6 +157,7 @@ sonos_mcp/
 
 **Features:**
 - Natural language music control
+- Interactive and headless modes (`-p` for one-off commands)
 - Session resumption (`-r SESSION_ID` or `-c` for continue)
 - Verbose mode (`-v`) to show tool calls
 - Conversation logging (`-l LOG_FILE`)
@@ -220,10 +222,11 @@ sonos_mcp/
 
 ### Running the Agent
 
+**Interactive Mode** (conversation loop):
 ```bash
 cd claude_sdk_agent
 
-# Basic usage
+# Basic interactive usage
 python3 sdk_agent.py
 
 # With verbose mode (shows tool calls)
@@ -240,6 +243,27 @@ python3 sdk_agent.py -c
 
 # Combine options
 python3 sdk_agent.py -v -l debug.log
+```
+
+**Headless Mode** (single command execution):
+```bash
+# Execute a one-off command and exit
+python3 sdk_agent.py -p "clear the queue and play playlist favorites"
+
+# With verbose mode to see tool calls
+python3 sdk_agent.py -v -p "what's playing?"
+
+# With logging
+python3 sdk_agent.py -l commands.log -p "turn it up"
+
+# Resume session, add one command, and exit
+python3 sdk_agent.py -r abc123 -p "play next track"
+
+# Combine verbose and logging in headless mode
+python3 sdk_agent.py -v -l headless.log -p "set volume to 50"
+
+# Use in scripts or automation
+python3 sdk_agent.py -p "play morning playlist" && echo "Music started!"
 ```
 
 ### Example Conversations
@@ -508,6 +532,41 @@ Essential for:
 - Understanding agent behavior
 - Verifying correct tool usage
 - Development and testing
+
+### Headless Mode
+
+Execute single commands without entering interactive conversation loop:
+
+```bash
+# One-off command
+python3 sdk_agent.py -p "clear the queue and play playlist favorites"
+
+# Output: Task completion message, then exits
+```
+
+**Use Cases:**
+- Shell scripts and automation
+- Cron jobs for scheduled music
+- Integration with other tools
+- Quick commands without conversation UI
+
+**Features Preserved:**
+- Verbose mode (`-v`) - shows tool calls during execution
+- Logging (`-l`) - records headless session to file
+- Session management (`-r`, `-c`) - can resume/continue sessions
+- All MCP tools work identically
+
+**Example Scripts:**
+```bash
+#!/bin/bash
+# Morning music routine
+python3 sdk_agent.py -p "set volume to 30"
+python3 sdk_agent.py -p "play morning playlist"
+
+# Evening wind-down
+python3 sdk_agent.py -p "set volume to 20"
+python3 sdk_agent.py -p "play chill playlist"
+```
 
 ## Music Service Integration
 

@@ -216,10 +216,18 @@ async def main():
         action='store_true',
         help='Continue the most recent conversation'
     )
+    parser.add_argument(
+        '-p', '--prompt',
+        type=str,
+        metavar='PROMPT',
+        help='Execute a single prompt and exit (headless mode)'
+    )
     args = parser.parse_args()
 
     print("🎵 Sonos Claude SDK Agent")
     print("=" * 40)
+    if args.prompt:
+        print("⚡ Headless mode - executing single prompt")
     if args.verbose:
         print("🔧 Verbose mode enabled - tool calls will be shown")
     if args.log:
@@ -228,7 +236,8 @@ async def main():
         print(f"🔄 Resuming session: {args.resume}")
     if args.continue_conversation:
         print("🔄 Continuing most recent conversation")
-    print("\nType 'quit' or 'exit' to stop.\n")
+    if not args.prompt:
+        print("\nType 'quit' or 'exit' to stop.\n")
 
     # Check for API key
     if not os.getenv('ANTHROPIC_API_KEY'):
@@ -246,6 +255,16 @@ async def main():
         await agent.start()
 
         try:
+            # Headless mode - single prompt execution
+            if args.prompt:
+                response = await agent.chat(args.prompt)
+                print(response)
+                # Display session ID before exiting
+                if agent.session_id:
+                    print(f"\n📋 Session ID: {agent.session_id}", file=sys.stderr)
+                return
+
+            # Interactive mode - continuous conversation loop
             while True:
                 try:
                     # Get user input
