@@ -40,7 +40,7 @@ def initialize_speaker(max_retries=10):
 
 # Initialize speaker connection on startup
 try:
-    sonos_actions.master = initialize_speaker()
+    initialize_speaker()
 except Exception as e:
     print(f"WARNING: Could not initialize speaker on startup: {e}", file=sys.stderr)
     print("Speaker initialization will be retried on first tool call", file=sys.stderr)

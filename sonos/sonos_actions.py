@@ -30,8 +30,36 @@ from unidecode import unidecode
 
 ms = MusicService(music_service)
  
-def set_master(speaker):
-     return by_name(speaker)
+#def set_master(speaker):
+#     return by_name(speaker)
+def set_master(speaker=None):
+    global master
+    if speaker is None:
+        speaker = master_speaker
+    master = by_name(speaker)
+    if master is None:
+        for n in range(3):
+            master = by_name(speaker)
+            if master is not None:
+                print(f"Reset master to {speaker}")
+                break
+            else:
+                if n < 2:
+                    print(f"Attempt {n+2} to set master to {speaker} failed, retrying...")
+                    sleep(1)
+                else:
+                    print(f"Failed to set master to {speaker} after several attempts.")
+                    return None
+    return master
+    
+def check_master():
+    global master
+    if master is None:
+        master = set_master()
+    if master:
+         return True
+    else:
+         return False
     
 def my_add_to_queue(uri, metadata):
     # generally don't need the uri (can be passed as '') although passing it in
@@ -126,6 +154,8 @@ def play_station(station):
         master.play_uri(uri, meta, station[0]) # station[0] is the title of the station
 
 def list_queue():
+    if not check_master():
+        return []
     queue = master.get_queue()
     response = []
     for t in queue:
