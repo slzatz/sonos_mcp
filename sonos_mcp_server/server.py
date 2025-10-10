@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/slzatz/sonos_mcp/.venv/bin/python3
 """
 Standalone Sonos MCP Server
 Exposes Sonos control functionality as MCP tools using stdio transport.
