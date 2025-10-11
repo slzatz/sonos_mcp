@@ -99,6 +99,24 @@ I'll find some great live tracks from Neil Young, Patty Griffin, and Bruce Sprin
 
 These tracks are now at the end of your queue (positions 20-25). Would you like me to start playing them now, or are you happy with what's currently playing?
 
+Last example:
+
+🎵 You: can you find some songs from the Drive By Truckers that were written by Jason Isbell and put them on the queue
+🤖 Assistant: 🔧 [TOOL] search_for_track(query='Drive-By Truckers Jason Isbell Outfit')
+🔧 [TOOL] search_for_track(query='Drive-By Truckers Decoration Day')
+🔧 [TOOL] add_track_to_queue(position=1)
+...
+🔧 [TOOL] list_queue()
+I'll search for Drive-By Truckers songs written by Jason Isbell and add them to your queue.Let me search more broadly for Drive-By Truckers tracks:Great! I can see "Decoration Day" and "Outfit" - both Jason Isbell classics. Let me add "Decoration Day" first and then search for more Isbell-penned tracks:Perfect! I've added 5 excellent Drive-By Truckers songs written by Jason Isbell to your queue. Here's what I selected:
+
+1. **Decoration Day** - The powerful title track from their 2003 album, telling a dark story about family feuds and cycles of violence
+2. **Outfit** - A deeply personal song based on advice Jason's father gave him, one of his most beloved tracks
+3. **Goddamn Lonely Love** - An emotionally raw track from The Dirty South about heartbreak and longing
+4. **Danko/Manuel** - A beautiful tribute to The Band's Rick Danko and Richard Manuel, showcasing Isbell's storytelling at its finest
+5. **Never Gonna Change** - Another gem from The Dirty South about being stuck in destructive patterns
+
+These tracks are from Jason's time with the band (roughly 2001-2007) and represent some of his best songwriting before he
+
 ----------------------------
 
 **Note:** You can use instructions in the system prompt to guide how wordy and sycophantic, enthusiastic etc. the agent will be.  For the moment, I am enjoying its commentary and energy but the instructions can be changed to suit the style of agent you'd prefer. The system prompt contains s summary of the tools that the agent has access to as well as some example scenarios that the agent is intended to manage. 
