@@ -8,6 +8,7 @@ A comprehensive Sonos speaker control system with natural language interface usi
 
 **Key Features:**
 - Natural language control: "Play Heart of Gold by Neil Young", "Turn it up", "Show my playlists"
+- **Agent Skills architecture** with progressive disclosure for efficient context usage
 - Music search across Amazon Music
 - Queue and playlist management
 - Volume control (adjust, set level, mute/unmute)
@@ -15,6 +16,7 @@ A comprehensive Sonos speaker control system with natural language interface usi
 - Session resumption for continuous conversations
 - Headless mode for one-off commands and scripting
 - MCP server compatible with Claude Desktop and other MCP clients
+- Modular skill updates without agent code changes
 
 ## Architecture
 
@@ -37,11 +39,19 @@ Sonos Speakers (network)
 2. **Reusability**: Server works with any MCP-compatible client
 3. **Direct Execution**: No subprocess overhead, direct Python function calls
 4. **Standard Protocol**: Follows official MCP specification
+5. **Modular Knowledge**: Agent Skills provide domain expertise via progressive disclosure
 
 ## Project Structure
 
 ```
 sonos_mcp/
+├── .claude/                    # Agent Skills (auto-discovered)
+│   └── skills/
+│       └── sonos-control/      # Sonos domain knowledge skill
+│           ├── SKILL.md        # Main skill with workflows and tools
+│           └── references/     # Additional reference materials
+│               └── search_tips.md
+│
 ├── sonos/                      # Core Sonos control library
 │   ├── __init__.py
 │   ├── sonos_actions.py        # Main Sonos operations using SoCo
@@ -58,7 +68,7 @@ sonos_mcp/
 │
 ├── claude_sdk_agent/           # Claude Agent SDK Client
 │   ├── sdk_agent.py            # Interactive agent (connects to MCP server)
-│   ├── system_prompt.py        # Music domain system prompt
+│   ├── system_prompt.py        # Lightweight agent prompt (32 lines)
 │   ├── requirements.txt        # Agent dependencies
 │   └── .env                    # ANTHROPIC_API_KEY (gitignored)
 │
@@ -70,7 +80,41 @@ sonos_mcp/
 
 ## Core Components
 
-### 1. Sonos Library (`sonos/`)
+### 1. Agent Skills (`.claude/skills/`)
+
+**Purpose**: Modular, filesystem-based domain knowledge that the Agent SDK auto-discovers.
+
+**Architecture:**
+- Skills follow Anthropic's Agent Skills specification
+- Auto-discovered by Claude Agent SDK at runtime
+- Implements **progressive disclosure**: metadata always loaded, detailed content loaded only when relevant
+- Enables independent updates without modifying agent code
+
+**Sonos Control Skill** (`.claude/skills/sonos-control/`):
+- **`SKILL.md`**: Comprehensive Sonos domain knowledge
+  - YAML frontmatter: name and description for auto-discovery
+  - Tool descriptions: All 21 MCP tools with parameters
+  - Workflows: Step-by-step guides (basic playback, custom mixes, playlists)
+  - Advanced patterns: Live performances, multi-room control, error handling
+  - Best practices: Selection logic, ambiguity resolution, natural responses
+- **`references/`**: Additional reference materials
+  - `search_tips.md`: Advanced search strategies and artist name variations
+
+**Why Skills Over System Prompt:**
+- **Modularity**: Update skill independently of agent code
+- **Efficiency**: Progressive disclosure reduces context usage
+- **Maintainability**: Skill changes don't require agent redeployment
+- **Reusability**: Same skill works across claude.ai, Claude Desktop, and Agent SDK
+- **Extensibility**: Add new skills without modifying agent architecture
+
+**Discovery Process:**
+1. Agent SDK scans `.claude/skills/` at startup
+2. Loads skill metadata (name + description) into system prompt
+3. When user request matches skill description, SDK reads SKILL.md
+4. Skill content enters context window only when needed
+5. Referenced files (like `references/search_tips.md`) loaded on demand
+
+### 2. Sonos Library (`sonos/`)
 
 **Purpose**: Core Python library for Sonos speaker control using the SoCo package.
 
@@ -100,7 +144,7 @@ sonos_mcp/
 - `httpx`: HTTP client for API requests
 - `unidecode`: Unicode text normalization
 
-### 2. MCP Server (`sonos_mcp_server/`)
+### 3. MCP Server (`sonos_mcp_server/`)
 
 **Purpose**: Standalone MCP server exposing Sonos functionality as MCP tools.
 
@@ -151,17 +195,18 @@ sonos_mcp/
 - Logs to stderr (stdio-safe for MCP protocol)
 - Graceful error handling for all operations
 
-### 3. Claude Agent (`claude_sdk_agent/`)
+### 4. Claude Agent (`claude_sdk_agent/`)
 
-**Purpose**: Interactive conversational agent using Claude Agent SDK.
+**Purpose**: Interactive conversational agent using Claude Agent SDK with skill-based architecture.
 
 **Features:**
-- Natural language music control
+- Natural language music control via auto-discovered skills
 - Interactive and headless modes (`-p` for one-off commands)
 - Session resumption (`-r SESSION_ID` or `-c` for continue)
 - Verbose mode (`-v`) to show tool calls
 - Conversation logging (`-l LOG_FILE`)
 - Auto-launches MCP server on startup
+- Automatic skill discovery from `.claude/skills/`
 
 **Model**: Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
 
@@ -171,11 +216,14 @@ sonos_mcp/
   - Connects to external MCP server via stdio
   - Handles conversation flow and tool execution
   - Session management and logging
+  - No hardcoded skill references (skills auto-discovered)
 
-- **`system_prompt.py`**: Comprehensive music domain prompt
-  - Guides Claude on Sonos operations
-  - Explains tool usage workflows
-  - Provides examples for common tasks
+- **`system_prompt.py`**: Lightweight agent personality (32 lines)
+  - Agent role and behavioral guidelines
+  - Core principles (proactive, knowledgeable, conversational)
+  - High-level capability summary
+  - **References** sonos-control skill for domain knowledge
+  - **Does NOT contain** tool descriptions, workflows, or examples (moved to skill)
 
 ## Setup and Installation
 
@@ -354,6 +402,8 @@ Opens web UI at `http://localhost:5173` for testing tools.
 
 ### Adding New Tools
 
+When adding new Sonos functionality, you need to update three layers:
+
 1. **Add function to `sonos/sonos_actions.py`:**
    ```python
    def your_new_function(param: str) -> str:
@@ -381,6 +431,36 @@ Opens web UI at `http://localhost:5173` for testing tools.
        "mcp__sonos__your_new_tool"
    ]
    ```
+
+4. **Update skill in `.claude/skills/sonos-control/SKILL.md`:**
+   - Add tool to "Available MCP Tools" section
+   - Include description, parameters, and usage notes
+   - Add workflow examples showing when/how to use it
+   - Update relevant sections (e.g., "Common Request Patterns")
+   - **No agent code changes needed** - skill is auto-discovered
+
+### Updating Skills
+
+Skills can be updated independently without modifying agent code:
+
+**To update the sonos-control skill:**
+1. Edit `.claude/skills/sonos-control/SKILL.md`
+2. Modify tool descriptions, workflows, or examples
+3. Add/update reference files in `references/` directory
+4. Test: Run agent and verify skill changes are reflected
+
+**Skill changes take effect immediately** - the Agent SDK reads SKILL.md on each relevant request (progressive disclosure).
+
+**When to update the skill vs system prompt:**
+- **Update skill**: Tool usage, workflows, domain knowledge, examples
+- **Update system prompt**: Agent personality, core behavior, general guidelines
+
+**Skill best practices:**
+- Keep YAML frontmatter concise (name + when to use description)
+- Organize content with clear headings for easy navigation
+- Provide specific examples for complex workflows
+- Include error handling guidance
+- Reference additional files for detailed information
 
 ### Testing
 
@@ -427,7 +507,13 @@ python3 claude_sdk_agent/sdk_agent.py -v
 3. **Agent configuration** in `claude_sdk_agent/sdk_agent.py`:
    - MCP server connection via stdio
    - Tool allowlist with `mcp__sonos__` prefix
-   - System prompt for domain knowledge
+   - Lightweight system prompt for agent personality
+
+4. **Domain knowledge** in `.claude/skills/sonos-control/SKILL.md`:
+   - Tool descriptions and parameters
+   - Workflows and usage patterns
+   - Best practices and error handling
+   - Auto-discovered by Agent SDK (no code changes needed)
 
 ## Configuration Files
 
@@ -632,8 +718,10 @@ Should show all Sonos speakers on network.
 
 ## References
 
-- **MCP Protocol**: https://modelcontextprotocol.io/
+- **Agent Skills**: https://www.anthropic.com/news/skills
+- **Agent Skills Documentation**: https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills
 - **Claude Agent SDK**: https://docs.anthropic.com/en/api/agent-sdk
+- **MCP Protocol**: https://modelcontextprotocol.io/
 - **SoCo Library**: https://github.com/SoCo/SoCo
 - **FastMCP**: https://docs.modelcontextprotocol.io/docs/tools/fastmcp
 - **Anthropic API**: https://docs.anthropic.com/

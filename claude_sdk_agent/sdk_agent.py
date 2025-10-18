@@ -91,6 +91,7 @@ class SonosSDKAgent:
                 "mcp__sonos__remove_track_from_playlist"
             ],
             system_prompt=SONOS_SYSTEM_PROMPT,
+            setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/
             # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
             permission_mode="bypassPermissions",  # Auto-execute tools without prompting
             resume=resume_session if resume_session else None,
