@@ -83,12 +83,16 @@ class SonosSDKAgent:
                 "mcp__sonos__current_track",
                 "mcp__sonos__play_pause",
                 "mcp__sonos__next_track",
-                # Playlist management
+                # Playlist management (local playlists)
+                "mcp__sonos__list_playlists",
                 "mcp__sonos__add_to_playlist_from_queue",
                 "mcp__sonos__add_to_playlist_from_search",
                 "mcp__sonos__add_playlist_to_queue",
                 "mcp__sonos__list_playlist_tracks",
-                "mcp__sonos__remove_track_from_playlist"
+                "mcp__sonos__remove_track_from_playlist",
+                # Native Sonos playlist management
+                "mcp__sonos__list_native_sonos_playlists",
+                "mcp__sonos__create_native_sonos_playlist_from_local"
             ],
             system_prompt=SONOS_SYSTEM_PROMPT,
             setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/

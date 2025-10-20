@@ -1,6 +1,6 @@
 # Sonos MCP Server
 
-A standalone Model Context Protocol (MCP) server for controlling Sonos speakers. This server exposes 17 tools for natural language control of Sonos systems.
+A standalone Model Context Protocol (MCP) server for controlling Sonos speakers. This server exposes 21 tools for natural language control of Sonos systems.
 
 ## Architecture
 
@@ -51,7 +51,7 @@ The server will:
 
 The Claude SDK Agent (`claude_sdk_agent/sdk_agent.py`) is configured to auto-launch the server when needed. No manual start required.
 
-## Available Tools (17 total)
+## Available Tools (21 total)
 
 ### Speaker Management (2 tools)
 - `get_master_speaker` - Get current master speaker name
@@ -78,13 +78,19 @@ The Claude SDK Agent (`claude_sdk_agent/sdk_agent.py`) is configured to auto-lau
 - `play_pause` - Toggle play/pause
 - `next_track` - Skip to next track
 
-### Playlist Management (5 tools)
-- `add_to_playlist_from_queue` - Add track from queue to playlist
-- `add_to_playlist_from_search` - Add track from search to playlist
-- `add_playlist_to_queue` - Add entire playlist to queue
-- `list_playlists` - Show all playlists
-- `list_playlist_tracks` - Show all tracks in a playlist
-- `remove_track_from_playlist` - Remove track from playlist
+### Playlist Management (8 tools)
+
+**Local Playlists (filesystem storage):**
+- `list_playlists` - Show all local playlists
+- `add_to_playlist_from_queue` - Add track from queue to local playlist
+- `add_to_playlist_from_search` - Add track from search to local playlist
+- `add_playlist_to_queue` - Add entire local playlist to queue (with optional shuffle)
+- `list_playlist_tracks` - Show all tracks in a local playlist
+- `remove_track_from_playlist` - Remove track from local playlist
+
+**Native Sonos Playlists (Sonos system storage):**
+- `list_native_sonos_playlists` - Show all native Sonos playlists (accessible in Sonos app)
+- `create_native_sonos_playlist_from_local` - Convert local playlist to native Sonos playlist
 
 ## Configuration for Different Clients
 

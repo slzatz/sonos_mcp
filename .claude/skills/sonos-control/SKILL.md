@@ -30,6 +30,7 @@ Most music requests require multiple tool calls in sequence. Execute workflows a
 ### Queue Management
 - `sonos:list_queue` - View all queued tracks
 - `sonos:clear_queue` - Remove all tracks from queue
+- `sonos:remove_from_queue` - Remove a track from the queue by position (1-based)
 - `sonos:play_from_queue` - Play track at specific queue position (1-based)
 
 ### Playback Control
@@ -43,12 +44,25 @@ Most music requests require multiple tool calls in sequence. Execute workflows a
 - `sonos:mute` - Mute or unmute (True/False)
 
 ### Playlist Management
-- `sonos:list_playlists` - Display all saved playlists
-- `sonos:list_playlist_tracks` - Show tracks in a specific playlist
-- `sonos:add_to_playlist_from_queue` - Add queue track to playlist by position
-- `sonos:add_to_playlist_from_search` - Add search result to playlist by position
-- `sonos:add_playlist_to_queue` - Load entire playlist into queue
-- `sonos:remove_track_from_playlist` - Remove track from playlist by position
+
+**Terminology:**
+- **"playlist"** or **"local playlist"** = Playlists stored locally on the filesystem (`~/.sonos/playlists/`)
+- **"native Sonos playlist"** = Playlists stored on the Sonos system (accessible from Sonos mobile app)
+
+**Local Playlist Tools:**
+- `sonos:list_playlists` - Display all local playlists
+- `sonos:list_playlist_tracks` - Show tracks in a specific local playlist
+- `sonos:add_to_playlist_from_queue` - Add queue track to local playlist by position
+- `sonos:add_to_playlist_from_search` - Add search result to local playlist by position
+- `sonos:add_playlist_to_queue` - Load entire local playlist into queue (optionally shuffled with shuffle=True)
+- `sonos:remove_track_from_playlist` - Remove track from local playlist by position
+
+**Native Sonos Playlist Tools:**
+- `sonos:list_native_sonos_playlists` - Display all native Sonos playlists
+- `sonos:create_native_sonos_playlist_from_local(local_playlist, native_playlist_name=None)` - Convert a local playlist to a native Sonos playlist
+  - Checks for naming conflicts and reports if native playlist already exists
+  - Temporarily uses queue but restores original queue contents
+  - Makes playlist accessible from Sonos mobile app and other Sonos controllers
 
 ## Basic Workflow: Play a Track or Album
 
@@ -147,11 +161,99 @@ To play music in a specific room:
 3. sonos:add_to_playlist_from_queue "Chill Vibes" <position>
 ```
 
+### Copying Entire Queue to New Playlist
+
+To save the current queue as a new playlist (useful for preserving a curated queue):
+
+1. Use `sonos:list_queue` to see all tracks and count them
+2. For each track position (1 through N), use `sonos:add_to_playlist_from_queue` with the new playlist name
+3. The first call creates the new playlist; subsequent calls append tracks
+4. Optionally verify with `sonos:list_playlist_tracks`
+
+**Important:** When removing multiple tracks from a queue or playlist, always remove from highest position to lowest to avoid position shifts affecting remaining targets.
+
+**Example:** User says "save everything in the queue as playlist20250119"
+```
+1. sonos:list_queue (count 59 tracks)
+2. sonos:add_to_playlist_from_queue "playlist20250119" 1
+3. sonos:add_to_playlist_from_queue "playlist20250119" 2
+... (continue for all 59 positions)
+60. sonos:list_playlist_tracks "playlist20250119" (verify)
+```
+
+**Note:** For large queues (50+ tracks), execute all additions in sequence without requesting permission at each step, following the "Multi-Step Workflows" principle.
+
+## Selecting Multiple Tracks from One Artist
+
+When a user requests N tracks from an artist without specific guidance:
+
+### Default Strategy (No Prior Context)
+1. **Mix popular and quality tracks** - Include 1-2 well-known hits, rest can be deep cuts
+2. **Album variety** - Spread selections across 2-3 different albums when possible
+3. **Career representation** - For established artists, vary across different periods
+4. **Mood consistency** - Ensure tracks flow well together in sequence
+
+### Contextual Adjustments
+- **If user mentions "favorites"** - Prioritize most-streamed/canonical tracks
+- **If user says "best of"** - Focus on greatest hits and popular tracks
+- **If user mentions specific album** - Select all tracks from that album
+- **If user says "variety" or "mix"** - Maximize album and style diversity
+
+### When to Ask for Clarification
+Only ask if the request is genuinely ambiguous:
+- ✗ Don't ask: "play 3 Vienna Teng songs" (use default strategy)
+- ✓ Do ask: "play Neil Young songs" when user has requested both acoustic and electric in past
+- ✓ Do ask: "play some Beatles" (too many eras/styles to assume)
+
+### Selection Transparency
+In your response, briefly mention your selection reasoning:
+- "I've added 3 tracks mixing popular hits and album favorites..."
+- "Here are 3 tracks spanning her early and recent work..."
 ### Playing Playlists
 
 To play a saved playlist:
-1. Use `sonos:add_playlist_to_queue` to load all tracks
+1. Use `sonos:add_playlist_to_queue` to load all tracks (optionally with shuffle=True)
 2. Use `sonos:play_from_queue 1` to start playing
+
+**Example:** User says "play my favorites playlist"
+```
+1. sonos:add_playlist_to_queue "favorites"
+2. sonos:play_from_queue 1
+```
+
+**Example:** User says "play my workout playlist in random order"
+```
+1. sonos:add_playlist_to_queue "workout" shuffle=True
+2. sonos:play_from_queue 1
+```
+
+### Converting Local Playlists to Native Sonos Playlists
+
+To make a local playlist accessible in the Sonos mobile app and other Sonos controllers:
+
+1. **Check for conflicts** - Use `sonos:list_native_sonos_playlists` to see if the name already exists
+2. **Convert** - Use `sonos:create_native_sonos_playlist_from_local` with the local playlist name
+3. **Optionally specify different name** - Pass `native_playlist_name` parameter if desired
+4. **Verify** - Use `sonos:list_native_sonos_playlists` to confirm creation
+
+**Example:** User says "create a native Sonos playlist from my favorites playlist"
+```
+1. sonos:list_native_sonos_playlists (check if "favorites" already exists)
+2. sonos:create_native_sonos_playlist_from_local "favorites"
+3. sonos:list_native_sonos_playlists (verify it was created)
+```
+
+**Example:** User says "make a Sonos playlist called favorites_backup from my favorites playlist"
+```
+1. sonos:create_native_sonos_playlist_from_local "favorites" native_playlist_name="favorites_backup"
+2. sonos:list_native_sonos_playlists (verify)
+```
+
+**Important Notes:**
+- The conversion temporarily uses the queue but restores it automatically
+- If a native playlist with that name already exists, you'll get an error with a clear message
+- Ask the user if they want to use a different name or if they want you to proceed differently
+- Local and native playlists are independent - changes to one don't affect the other
 
 ## Common Request Patterns
 
@@ -164,6 +266,7 @@ To play a saved playlist:
 - "Next song" → `sonos:next_track`
 - "Pause" → `sonos:play_pause`
 - "What playlists do I have?" → `sonos:list_playlists`
+- "Show my native Sonos playlists" → `sonos:list_native_sonos_playlists`
 
 ### Complex Requests
 - "Play [specific track]" → Execute Basic Workflow
@@ -171,6 +274,9 @@ To play a saved playlist:
 - "Create a mix of [artists]" → Execute Custom Mix Workflow
 - "Play some [artist] in [room]" → Execute Multi-Room Workflow
 - "Add [track] to [playlist]" → Execute Playlist Workflow
+- "Play [playlist] shuffled/randomized/in random order" → Use `add_playlist_to_queue` with shuffle=True
+- "Create a native Sonos playlist from [local playlist]" → Execute Converting Local Playlists Workflow
+- "Make [local playlist] available in the Sonos app" → Execute Converting Local Playlists Workflow
 
 ## Response Guidelines
 

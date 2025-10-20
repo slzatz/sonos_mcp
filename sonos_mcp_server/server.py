@@ -173,6 +173,18 @@ async def clear_queue() -> str:
 
 
 @mcp.tool()
+async def remove_from_queue(position: int) -> str:
+    """Remove a track from the current queue.
+    Args:
+        position: The position number of the track in the queue (1-indexed)
+    """
+    try:
+        sonos_actions.remove_from_queue(position - 1)
+        return f"Successfully removed track at position {position} from the queue"
+    except Exception as e:
+        return f"Failed to remove a track from the  queue: {str(e)}"
+
+@mcp.tool()
 async def play_from_queue(position: int) -> str:
     """
     Play a track by its number in the Sonos queue.
@@ -309,15 +321,16 @@ async def add_to_playlist_from_search(playlist: str, position: int) -> str:
 
 
 @mcp.tool()
-async def add_playlist_to_queue(playlist: str) -> str:
+async def add_playlist_to_queue(playlist: str, shuffle: bool = False) -> str:
     """
     Add a named playlist to the Sonos queue.
 
     Args:
         playlist: Name of the saved playlist
+        shuffle: If True, randomize the order of tracks before adding to queue (default: False)
     """
     try:
-        result = sonos_actions.add_playlist_to_queue(playlist)
+        result = sonos_actions.add_playlist_to_queue(playlist, shuffle=shuffle)
         return result
     except Exception as e:
         return f"Failed to add playlist to queue: {str(e)}"
@@ -410,6 +423,43 @@ async def remove_track_from_playlist(playlist: str, position: int) -> str:
         return f"Removed track {position}: {title} by {artist} from playlist '{playlist_name}'"
     except Exception as e:
         return f"Failed to remove track from playlist: {str(e)}"
+
+
+# Native Sonos Playlist Tools
+
+@mcp.tool()
+async def list_native_sonos_playlists() -> str:
+    """
+    List all native Sonos playlists stored on the Sonos system.
+    Returns a numbered list of all native Sonos playlists.
+    """
+    try:
+        result = sonos_actions.get_native_sonos_playlists()
+        return result
+    except Exception as e:
+        return f"Failed to list native Sonos playlists: {str(e)}"
+
+
+@mcp.tool()
+async def create_native_sonos_playlist_from_local(local_playlist: str, native_playlist_name: str = None) -> str:
+    """
+    Create a native Sonos playlist from a local playlist file.
+
+    This allows you to convert your locally-stored playlists into native Sonos playlists
+    that will be accessible from the Sonos mobile app and other Sonos controllers.
+
+    Args:
+        local_playlist: Name of the local playlist file to convert
+        native_playlist_name: Optional name for the native Sonos playlist (defaults to local_playlist name)
+
+    Note: This operation will temporarily use the queue to create the native playlist,
+    but will restore the original queue contents when done.
+    """
+    try:
+        result = sonos_actions.create_native_playlist_from_local(local_playlist, native_playlist_name)
+        return result
+    except Exception as e:
+        return f"Failed to create native Sonos playlist: {str(e)}"
 
 
 def main():

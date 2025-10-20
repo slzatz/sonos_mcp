@@ -30,8 +30,6 @@ from unidecode import unidecode
 
 ms = MusicService(music_service)
  
-#def set_master(speaker):
-#     return by_name(speaker)
 def set_master(speaker=None):
     global master
     if speaker is None:
@@ -80,7 +78,6 @@ def my_add_to_queue(uri, metadata):
         qnumber = response['FirstTrackNumberEnqueued']
         return int(qnumber)
 
-# the 'action' functions
 def current_track_info(text=True):
     try:
         state = master.get_current_transport_info()['current_transport_state']
@@ -164,6 +161,9 @@ def list_queue():
         else:
             response.append({"title": t.metadata['title'], "artist": "", "album": "(MSTrack)"})
     return response
+
+def remove_from_queue(position):
+    master.remove_from_queue(position)
 
 def clear_queue():
     try:
@@ -354,7 +354,7 @@ def add_to_playlist_from_search(playlist, position):
 
     return f"Selected track {position}: {d["title"]} by {d["artist"]} from the search and added to playlist {playlist}"
 
-def add_playlist_to_queue(playlist):
+def add_playlist_to_queue(playlist, shuffle=False):
     filename = playlist
     file_path = Path.home() / ".sonos" / "playlists" / filename
 
@@ -364,13 +364,16 @@ def add_playlist_to_queue(playlist):
     with file_path.open('r') as file:
         tracks = json.load(file)
 
+    if shuffle:
+        random.shuffle(tracks)
+
     for t in tracks:
         #Note: the id appears to be necessary for track ddl but not for album ddl
         metadata = SONOS_DIDL.format(item_id=t['item_id'], uri=t['uri'])
         my_add_to_queue(t['uri'], metadata)
 
-
-    return f"Added {len(tracks)} tracks from playlist {playlist} to the queue"
+    shuffle_text = " in random order" if shuffle else ""
+    return f"Added {len(tracks)} tracks from playlist {playlist} to the queue{shuffle_text}"
 
 def list_playlists():
     """
@@ -391,6 +394,90 @@ def list_playlists():
     playlist_list = "\n".join([f"{i}. {name}" for i, name in enumerate(playlist_files, start=1)])
 
     return f"Available playlists ({len(playlist_files)}):\n{playlist_list}"
+
+def get_native_sonos_playlists():
+    """
+    List all native Sonos playlists stored on the Sonos system.
+    Returns a formatted string with playlist names.
+    """
+    try:
+        # Get native Sonos playlists using SoCo
+        playlists = master.get_sonos_playlists()
+
+        if not playlists:
+            return "No native Sonos playlists found."
+
+        # Format as numbered list
+        playlist_list = []
+        for i, playlist in enumerate(playlists, start=1):
+            playlist_list.append(f"{i}. {playlist.title}")
+
+        return f"Native Sonos playlists ({len(playlist_list)}):\n" + "\n".join(playlist_list)
+
+    except Exception as e:
+        return f"Error retrieving native Sonos playlists: {str(e)}"
+
+def create_native_playlist_from_local(local_playlist_name, native_playlist_name=None):
+    """
+    Create a native Sonos playlist from a local playlist.
+
+    Args:
+        local_playlist_name: Name of the local playlist file
+        native_playlist_name: Optional name for the native playlist (defaults to local_playlist_name)
+
+    Returns:
+        Success message or error string
+    """
+    # Check if local playlist exists
+    local_path = Path.home() / ".sonos" / "playlists" / local_playlist_name
+    if not local_path.is_file():
+        return f"Local playlist '{local_playlist_name}' does not exist"
+
+    # Determine native playlist name
+    target_name = native_playlist_name if native_playlist_name else local_playlist_name
+
+    # Check for conflicts with existing native playlists
+    try:
+        existing_playlists = master.get_sonos_playlists()
+        for playlist in existing_playlists:
+            if playlist.title == target_name:
+                return f"Native Sonos playlist '{target_name}' already exists. Please choose a different name or delete the existing playlist first."
+    except Exception as e:
+        return f"Error checking existing playlists: {str(e)}"
+
+    try:
+        # Save current queue to restore later (optional safeguard)
+        original_queue = list(master.get_queue())
+
+        # Clear the queue
+        master.clear_queue()
+
+        # Load local playlist into queue
+        result = add_playlist_to_queue(local_playlist_name)
+        if "does not exist" in result or "Error" in result:
+            return f"Failed to load local playlist: {result}"
+
+        # Create native Sonos playlist from queue
+        new_playlist = master.create_sonos_playlist_from_queue(target_name)
+
+        # Clear queue after creating playlist
+        master.clear_queue()
+
+        # Restore original queue (optional - comment out if you prefer not to restore)
+        for track in original_queue:
+            master.add_to_queue(track)
+
+        return f"Successfully created native Sonos playlist '{target_name}' from local playlist '{local_playlist_name}'"
+
+    except Exception as e:
+        # Try to restore queue on error
+        try:
+            master.clear_queue()
+            for track in original_queue:
+                master.add_to_queue(track)
+        except:
+            pass
+        return f"Error creating native playlist: {str(e)}"
 
 #### below here not currently in use ####
 def shuffle(artists):

@@ -25,12 +25,17 @@ The MCPs available functions are:
 - play_pause
 - next_track
 ### Playlist management
+**Local playlists (stored on filesystem):**
 - add_to_playlist_from_queue
 - add_to_playlist_from_search
 - add_playlist_to_queue
 - list_playlists
 - list_playlist_tracks
 - remove_track_from_playlist
+
+**Native Sonos playlists (stored on Sonos system):**
+- list_native_sonos_playlists
+- create_native_sonos_playlist_from_local
 
 The sonos agent has access to all the functions (tools) and decides how to use them to accomplish the user's requests.
 
@@ -116,6 +121,27 @@ I'll search for Drive-By Truckers songs written by Jason Isbell and add them to 
 5. **Never Gonna Change** - Another gem from The Dirty South about being stuck in destructive patterns
 
 These tracks are from Jason's time with the band (roughly 2001-2007) and represent some of his best songwriting before he
+
+Another example showing native Sonos playlists:
+
+🎵 You: Can you create a native Sonos playlist from my favorites playlist so I can access it in the Sonos app?
+🤖 Assistant: 🔧 [TOOL] list_native_sonos_playlists()
+🔧 [TOOL] create_native_sonos_playlist_from_local(local_playlist='favorites')
+🔧 [TOOL] list_native_sonos_playlists()
+
+Perfect! I've successfully created a native Sonos playlist called **favorites** from your local playlist.
+
+Here's what happened:
+- I first checked if a playlist with that name already existed on your Sonos system (it didn't)
+- I converted your local favorites playlist (8 tracks) into a native Sonos playlist
+- The playlist is now available on your Sonos system
+
+You can now access this playlist from:
+- Your Sonos mobile app
+- Any Sonos controller in your home
+- Voice assistants like Alexa
+
+The native playlist and your local playlist are independent - if you update one, the other won't automatically change. Would you like me to play it now?
 
 ----------------------------
 

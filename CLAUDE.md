@@ -181,13 +181,15 @@ sonos_mcp/
 - `set_volume` - Set absolute volume level (0-100)
 - `mute` - Mute or unmute all speakers in group
 
-*Playlist Management (6 tools):*
-- `list_playlists` - Display all available playlists
-- `add_to_playlist_from_queue` - Add track from queue to playlist
-- `add_to_playlist_from_search` - Add track from search to playlist
-- `add_playlist_to_queue` - Load entire playlist to queue
-- `list_playlist_tracks` - Show all tracks in playlist
-- `remove_track_from_playlist` - Remove track from playlist
+*Playlist Management (8 tools):*
+- `list_playlists` - Display all available local playlists
+- `add_to_playlist_from_queue` - Add track from queue to local playlist
+- `add_to_playlist_from_search` - Add track from search to local playlist
+- `add_playlist_to_queue` - Load entire local playlist to queue (supports shuffle parameter for randomized playback)
+- `list_playlist_tracks` - Show all tracks in local playlist
+- `remove_track_from_playlist` - Remove track from local playlist
+- `list_native_sonos_playlists` - Display all native Sonos playlists stored on Sonos system
+- `create_native_sonos_playlist_from_local` - Convert local playlist to native Sonos playlist (accessible in Sonos app)
 
 **Server Initialization:**
 - Connects to master speaker with retry logic (up to 10 attempts)
@@ -566,6 +568,10 @@ Session data stored by Claude Code CLI, includes full conversation history.
 
 ### Playlist Management
 
+The project supports two types of playlists:
+
+#### Local Playlists
+
 Playlists stored as JSON in `~/.sonos/playlists/`:
 
 ```json
@@ -580,11 +586,33 @@ Playlists stored as JSON in `~/.sonos/playlists/`:
 ]
 ```
 
-Operations:
+**Local Playlist Operations:**
 - Create: Add first track to new playlist name
 - View: `list_playlist_tracks`
 - Edit: `add_to_playlist_*`, `remove_track_from_playlist`
-- Play: `add_playlist_to_queue`
+- Play: `add_playlist_to_queue` (optionally with `shuffle=True` for randomized order)
+- Save queue as playlist: Use `add_to_playlist_from_queue` for each track position
+
+#### Native Sonos Playlists
+
+Playlists stored on the Sonos system, accessible from:
+- Sonos mobile app
+- Other Sonos controllers
+- Voice assistants (Alexa, Google Assistant)
+- Any interface that talks to Sonos
+
+**Native Playlist Operations:**
+- List: `list_native_sonos_playlists`
+- Convert from local: `create_native_sonos_playlist_from_local(local_playlist, native_name=None)`
+  - Checks for naming conflicts automatically
+  - Temporarily uses queue but restores original queue
+  - Makes playlist accessible in Sonos app
+- Future enhancements: Load to queue, delete, view tracks, sync with local
+
+**Design Philosophy:**
+- Local playlists: Convenient programmatic control and curation
+- Native playlists: Broader ecosystem access (apps, voice, etc.)
+- Both types are independent - changes to one don't affect the other
 
 ### Speaker Discovery
 
