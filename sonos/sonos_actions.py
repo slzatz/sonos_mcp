@@ -251,7 +251,7 @@ def add_album_to_queue(position):
     filename = "album_search.json"
     file_path = Path.home() / ".sonos" / "search_results" / filename
     with file_path.open('r') as file:
-        sonos_data = json.load(f)
+        sonos_data = json.load(file)
 
     item_id, uri = sonos_data[position-1]
 
