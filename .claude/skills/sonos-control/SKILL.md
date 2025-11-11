@@ -1,6 +1,6 @@
 ---
 name: sonos-control
-description: Control Sonos speakers through MCP tools - search and play music, manage queue and playlists, adjust volume. Use when users request music playback, mention artists/songs/albums, want to control Sonos speakers, manage playlists, or ask about what's playing.
+description: "[MCP MODE ONLY] Control Sonos speakers through MCP tools - search and play music, manage queue and playlists, adjust volume. DO NOT USE in direct mode. Only use when running with --mode mcp flag."
 ---
 
 # Sonos Control

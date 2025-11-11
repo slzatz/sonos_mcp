@@ -22,7 +22,7 @@ from pathlib import Path
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ToolUseBlock, ResultMessage
 
 # Import our local modules
-from system_prompt import SONOS_SYSTEM_PROMPT
+from system_prompt import SONOS_SYSTEM_PROMPT, SONOS_DIRECT_MODE_PROMPT
 
 try:
     from dotenv import load_dotenv
@@ -35,7 +35,8 @@ class SonosSDKAgent:
     """Sonos agent using Claude Agent SDK."""
 
     def __init__(self, verbose: bool = False, log_file: Optional[str] = None,
-                 resume_session: Optional[str] = None, continue_conversation: bool = False):
+                 resume_session: Optional[str] = None, continue_conversation: bool = False,
+                 mode: str = 'direct'):
         """
         Initialize the Sonos Claude SDK agent.
 
@@ -44,6 +45,7 @@ class SonosSDKAgent:
             log_file: Path to log file for conversation logging. If None, no logging.
             resume_session: Session ID to resume. If provided, continues that specific session.
             continue_conversation: If True, continues the most recent conversation.
+            mode: Execution mode - 'mcp' (via MCP server) or 'direct' (direct Python calls).
         """
         # Set up logging if requested
         self.logger = None
@@ -51,56 +53,70 @@ class SonosSDKAgent:
             self._setup_logging(log_file)
 
         self.verbose = verbose
+        self.mode = mode
         self.session_id = None  # Will be set after first interaction
 
-        # Configure external Sonos MCP server (stdio transport)
-        project_root = Path(__file__).parent.parent
-        server_path = project_root / "sonos_mcp_server" / "server.py"
-        venv_python = project_root / ".venv" / "bin" / "python3"
+        # Configure Claude Agent options based on mode
+        if mode == 'mcp':
+            # MCP mode: Configure external Sonos MCP server (stdio transport)
+            project_root = Path(__file__).parent.parent
+            server_path = project_root / "sonos_mcp_server" / "server.py"
+            venv_python = project_root / ".venv" / "bin" / "python3"
 
-        # Configure Claude Agent options
-        self.options = ClaudeAgentOptions(
-            mcp_servers={
-                "sonos": {
-                    "command": str(venv_python),
-                    "args": [str(server_path)]
-                }
-            },
-            allowed_tools=[
-                # Speaker management
-                "mcp__sonos__get_master_speaker",
-                "mcp__sonos__set_master_speaker",
-                # Music search
-                "mcp__sonos__search_for_track",
-                "mcp__sonos__search_for_album",
-                # Queue management
-                "mcp__sonos__add_track_to_queue",
-                "mcp__sonos__add_album_to_queue",
-                "mcp__sonos__list_queue",
-                "mcp__sonos__clear_queue",
-                "mcp__sonos__play_from_queue",
-                # Playback control
-                "mcp__sonos__current_track",
-                "mcp__sonos__play_pause",
-                "mcp__sonos__next_track",
-                # Playlist management (local playlists)
-                "mcp__sonos__list_playlists",
-                "mcp__sonos__add_to_playlist_from_queue",
-                "mcp__sonos__add_to_playlist_from_search",
-                "mcp__sonos__add_playlist_to_queue",
-                "mcp__sonos__list_playlist_tracks",
-                "mcp__sonos__remove_track_from_playlist",
-                # Native Sonos playlist management
-                "mcp__sonos__list_native_sonos_playlists",
-                "mcp__sonos__create_native_sonos_playlist_from_local"
-            ],
-            system_prompt=SONOS_SYSTEM_PROMPT,
-            setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/
-            # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
-            permission_mode="bypassPermissions",  # Auto-execute tools without prompting
-            resume=resume_session if resume_session else None,
-            continue_conversation=continue_conversation
-        )
+            self.options = ClaudeAgentOptions(
+                mcp_servers={
+                    "sonos": {
+                        "command": str(venv_python),
+                        "args": [str(server_path)]
+                    }
+                },
+                allowed_tools=[
+                    # Speaker management
+                    "mcp__sonos__get_master_speaker",
+                    "mcp__sonos__set_master_speaker",
+                    # Music search
+                    "mcp__sonos__search_for_track",
+                    "mcp__sonos__search_for_album",
+                    # Queue management
+                    "mcp__sonos__add_track_to_queue",
+                    "mcp__sonos__add_album_to_queue",
+                    "mcp__sonos__list_queue",
+                    "mcp__sonos__clear_queue",
+                    "mcp__sonos__play_from_queue",
+                    # Playback control
+                    "mcp__sonos__current_track",
+                    "mcp__sonos__play_pause",
+                    "mcp__sonos__next_track",
+                    # Playlist management (local playlists)
+                    "mcp__sonos__list_playlists",
+                    "mcp__sonos__add_to_playlist_from_queue",
+                    "mcp__sonos__add_to_playlist_from_search",
+                    "mcp__sonos__add_playlist_to_queue",
+                    "mcp__sonos__list_playlist_tracks",
+                    "mcp__sonos__remove_track_from_playlist",
+                    # Native Sonos playlist management
+                    "mcp__sonos__list_native_sonos_playlists",
+                    "mcp__sonos__create_native_sonos_playlist_from_local"
+                ],
+                system_prompt=SONOS_SYSTEM_PROMPT,
+                setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/
+                # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
+                permission_mode="bypassPermissions",  # Auto-execute tools without prompting
+                resume=resume_session if resume_session else None,
+                continue_conversation=continue_conversation
+            )
+        else:  # mode == 'direct'
+            # Direct mode: No MCP server, direct Python execution via Bash tool
+            self.options = ClaudeAgentOptions(
+                # No mcp_servers - using direct Python calls
+                # No allowed_tools - using Bash tool instead
+                system_prompt=SONOS_DIRECT_MODE_PROMPT,
+                setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/
+                # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
+                permission_mode="bypassPermissions",  # Auto-execute tools without prompting
+                resume=resume_session if resume_session else None,
+                continue_conversation=continue_conversation
+            )
 
         # Create the client
         self.client = ClaudeSDKClient(options=self.options)
@@ -227,10 +243,18 @@ async def main():
         metavar='PROMPT',
         help='Execute a single prompt and exit (headless mode)'
     )
+    parser.add_argument(
+        '-m', '--mode',
+        type=str,
+        choices=['mcp', 'direct'],
+        default='direct',
+        help='Execution mode: "mcp" (via MCP server) or "direct" (direct Python calls). Default: direct'
+    )
     args = parser.parse_args()
 
     print("🎵 Sonos Claude SDK Agent")
     print("=" * 40)
+    print(f"🎛️  Mode: {args.mode.upper()} {'(MCP server)' if args.mode == 'mcp' else '(direct Python)'}")
     if args.prompt:
         print("⚡ Headless mode - executing single prompt")
     if args.verbose:
@@ -255,7 +279,8 @@ async def main():
             verbose=args.verbose,
             log_file=args.log,
             resume_session=args.resume,
-            continue_conversation=args.continue_conversation
+            continue_conversation=args.continue_conversation,
+            mode=args.mode
         )
         await agent.start()
 

@@ -8,6 +8,7 @@ A comprehensive Sonos speaker control system with natural language interface usi
 
 **Key Features:**
 - Natural language control: "Play Heart of Gold by Neil Young", "Turn it up", "Show my playlists"
+- **Dual execution modes**: MCP server (portable) or direct Python (efficient)
 - **Agent Skills architecture** with progressive disclosure for efficient context usage
 - Music search across Amazon Music
 - Queue and playlist management
@@ -20,8 +21,9 @@ A comprehensive Sonos speaker control system with natural language interface usi
 
 ## Architecture
 
-The project uses a **standalone MCP server architecture**:
+The project supports **two execution modes** for maximum flexibility:
 
+### MCP Mode (Portable)
 ```
 User/Client
     ↓
@@ -34,12 +36,55 @@ Sonos Actions Library (sonos/)
 Sonos Speakers (network)
 ```
 
+**Use Cases:**
+- Claude Desktop integration
+- Multi-client scenarios
+- When portability matters
+- Standard tool-based workflows
+
+**Context Overhead:** ~17% (~34k tokens for 21 MCP tool definitions)
+
+### Direct Mode (Efficient - Default)
+```
+User/Client
+    ↓
+Claude Agent SDK (claude_sdk_agent/)
+    ↓ Bash tool with inline Python
+Sonos Actions Library (sonos/)
+    ↓ SoCo Library
+Sonos Speakers (network)
+```
+
+**Use Cases:**
+- Local development and testing
+- Complex workflows (loops, data processing)
+- Performance-critical operations
+- Batch operations
+
+**Context Overhead:** ~2.5% (~5k tokens for skill metadata)
+**Token Savings:** ~15% compared to MCP mode
+
+### Switching Between Modes
+
+```bash
+# Direct mode (default) - no flag needed
+python3 sdk_agent.py
+
+# MCP mode (explicit)
+python3 sdk_agent.py --mode mcp
+
+# Both modes support all features
+python3 sdk_agent.py --mode direct -v -l session.log
+python3 sdk_agent.py --mode mcp -p "play music"
+```
+
 **Key Design Principles:**
-1. **Separation of Concerns**: MCP server runs as independent process
-2. **Reusability**: Server works with any MCP-compatible client
-3. **Direct Execution**: No subprocess overhead, direct Python function calls
-4. **Standard Protocol**: Follows official MCP specification
-5. **Modular Knowledge**: Agent Skills provide domain expertise via progressive disclosure
+1. **Dual Execution**: Choose between MCP (portable) or direct (efficient)
+2. **Separation of Concerns**: MCP server runs as independent process when needed
+3. **Reusability**: MCP server works with any MCP-compatible client
+4. **Direct Efficiency**: Skip protocol overhead for local development
+5. **Standard Protocol**: Follows official MCP specification
+6. **Modular Knowledge**: Agent Skills provide domain expertise via progressive disclosure
 
 ## Project Structure
 
@@ -47,10 +92,12 @@ Sonos Speakers (network)
 sonos_mcp/
 ├── .claude/                    # Agent Skills (auto-discovered)
 │   └── skills/
-│       └── sonos-control/      # Sonos domain knowledge skill
-│           ├── SKILL.md        # Main skill with workflows and tools
-│           └── references/     # Additional reference materials
-│               └── search_tips.md
+│       ├── sonos-control/      # MCP mode: Sonos domain knowledge skill
+│       │   ├── SKILL.md        # Main skill with workflows and tools
+│       │   └── references/     # Additional reference materials
+│       │       └── search_tips.md
+│       └── sonos-direct-code/  # Direct mode: Python function reference
+│           └── SKILL.md        # Function signatures and workflows
 │
 ├── sonos/                      # Core Sonos control library
 │   ├── __init__.py
@@ -89,9 +136,10 @@ sonos_mcp/
 - Auto-discovered by Claude Agent SDK at runtime
 - Implements **progressive disclosure**: metadata always loaded, detailed content loaded only when relevant
 - Enables independent updates without modifying agent code
+- Different skills for different execution modes
 
-**Sonos Control Skill** (`.claude/skills/sonos-control/`):
-- **`SKILL.md`**: Comprehensive Sonos domain knowledge
+**Sonos Control Skill** (`.claude/skills/sonos-control/`) - Used in **MCP mode**:
+- **`SKILL.md`**: Comprehensive MCP tool documentation
   - YAML frontmatter: name and description for auto-discovery
   - Tool descriptions: All 21 MCP tools with parameters
   - Workflows: Step-by-step guides (basic playback, custom mixes, playlists)
@@ -99,6 +147,15 @@ sonos_mcp/
   - Best practices: Selection logic, ambiguity resolution, natural responses
 - **`references/`**: Additional reference materials
   - `search_tips.md`: Advanced search strategies and artist name variations
+
+**Sonos Direct Code Skill** (`.claude/skills/sonos-direct-code/`) - Used in **Direct mode**:
+- **`SKILL.md`**: Comprehensive Python function documentation
+  - YAML frontmatter: name and description for auto-discovery
+  - Function signatures: All sonos_actions.py functions with parameters and return types
+  - Recommended functions: Current, working functions vs deprecated/legacy
+  - Common workflows: Search/play, custom playlists, queue analysis, batch operations
+  - File locations: Search results cache, playlist storage
+  - Best practices: Error handling, initialization patterns, performance tips
 
 **Why Skills Over System Prompt:**
 - **Modularity**: Update skill independently of agent code
@@ -202,12 +259,13 @@ sonos_mcp/
 **Purpose**: Interactive conversational agent using Claude Agent SDK with skill-based architecture.
 
 **Features:**
+- **Dual execution modes**: MCP server (portable) or direct Python (efficient)
 - Natural language music control via auto-discovered skills
 - Interactive and headless modes (`-p` for one-off commands)
 - Session resumption (`-r SESSION_ID` or `-c` for continue)
 - Verbose mode (`-v`) to show tool calls
 - Conversation logging (`-l LOG_FILE`)
-- Auto-launches MCP server on startup
+- Mode selection via `--mode` flag (default: direct)
 - Automatic skill discovery from `.claude/skills/`
 
 **Model**: Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
@@ -215,17 +273,19 @@ sonos_mcp/
 **Key Components:**
 - **`sdk_agent.py`**: Main agent application
   - `SonosSDKAgent` class manages agent lifecycle
-  - Connects to external MCP server via stdio
+  - **MCP mode**: Connects to external MCP server via stdio
+  - **Direct mode**: Uses Bash tool with inline Python code
   - Handles conversation flow and tool execution
   - Session management and logging
   - No hardcoded skill references (skills auto-discovered)
 
-- **`system_prompt.py`**: Lightweight agent personality (32 lines)
+- **`system_prompt.py`**: Lightweight agent personality
+  - **`SONOS_SYSTEM_PROMPT`**: MCP mode prompt (references sonos-control skill)
+  - **`SONOS_DIRECT_MODE_PROMPT`**: Direct mode prompt (references sonos-direct-code skill)
   - Agent role and behavioral guidelines
   - Core principles (proactive, knowledgeable, conversational)
-  - High-level capability summary
-  - **References** sonos-control skill for domain knowledge
-  - **Does NOT contain** tool descriptions, workflows, or examples (moved to skill)
+  - Mode-specific execution instructions
+  - **Does NOT contain** tool/function descriptions (moved to skills)
 
 ## Setup and Installation
 
@@ -270,16 +330,42 @@ sonos_mcp/
 
 ## Usage
 
+### Execution Modes
+
+The agent supports two execution modes via the `--mode` flag:
+
+**Direct Mode (Default)** - Efficient, token-saving:
+```bash
+python3 sdk_agent.py              # No flag needed
+python3 sdk_agent.py --mode direct  # Explicit
+```
+- Uses Bash tool with inline Python code
+- Calls `sonos_actions` functions directly
+- ~15% token savings vs MCP mode
+- Ideal for: Local development, complex workflows, batch operations
+
+**MCP Mode** - Portable, standardized:
+```bash
+python3 sdk_agent.py --mode mcp
+```
+- Launches external MCP server process
+- Uses 21 MCP tools via stdio protocol
+- Compatible with Claude Desktop
+- Ideal for: Multi-client scenarios, portability
+
 ### Running the Agent
 
 **Interactive Mode** (conversation loop):
 ```bash
 cd claude_sdk_agent
 
-# Basic interactive usage
+# Direct mode (default) - basic interactive usage
 python3 sdk_agent.py
 
-# With verbose mode (shows tool calls)
+# MCP mode - explicit
+python3 sdk_agent.py --mode mcp
+
+# With verbose mode (shows tool/function calls)
 python3 sdk_agent.py -v
 
 # With logging
@@ -291,14 +377,18 @@ python3 sdk_agent.py -r abc123def456
 # Continue most recent conversation
 python3 sdk_agent.py -c
 
-# Combine options
-python3 sdk_agent.py -v -l debug.log
+# Combine options (works in both modes)
+python3 sdk_agent.py --mode direct -v -l debug.log
+python3 sdk_agent.py --mode mcp -v -l debug.log
 ```
 
 **Headless Mode** (single command execution):
 ```bash
-# Execute a one-off command and exit
+# Direct mode (default) - execute a one-off command and exit
 python3 sdk_agent.py -p "clear the queue and play playlist favorites"
+
+# MCP mode - explicit
+python3 sdk_agent.py --mode mcp -p "what's playing?"
 
 # With verbose mode to see tool calls
 python3 sdk_agent.py -v -p "what's playing?"
