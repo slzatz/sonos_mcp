@@ -49,7 +49,8 @@ Sonos Speakers (network)
 User/Client
     ↓
 Claude Agent SDK (claude_sdk_agent/)
-    ↓ Bash tool with inline Python
+    ↓ Bash tool → Dispatcher Tool (sonos_tool.py)
+    ↓ Direct Python imports
 Sonos Actions Library (sonos/)
     ↓ SoCo Library
 Sonos Speakers (network)
@@ -57,7 +58,7 @@ Sonos Speakers (network)
 
 **Use Cases:**
 - Local development and testing
-- Complex workflows (loops, data processing)
+- Complex workflows requiring multiple operations
 - Performance-critical operations
 - Batch operations
 
@@ -96,8 +97,9 @@ sonos_mcp/
 │       │   ├── SKILL.md        # Main skill with workflows and tools
 │       │   └── references/     # Additional reference materials
 │       │       └── search_tips.md
-│       └── sonos-direct-code/  # Direct mode: Python function reference
-│           └── SKILL.md        # Function signatures and workflows
+│       └── sonos-direct-code/  # Direct mode: Dispatcher tool interface
+│           ├── SKILL.md        # Tool documentation and workflows
+│           └── sonos_tool.py   # CLI dispatcher (21 discrete tools)
 │
 ├── sonos/                      # Core Sonos control library
 │   ├── __init__.py
@@ -149,13 +151,18 @@ sonos_mcp/
   - `search_tips.md`: Advanced search strategies and artist name variations
 
 **Sonos Direct Code Skill** (`.claude/skills/sonos-direct-code/`) - Used in **Direct mode**:
-- **`SKILL.md`**: Comprehensive Python function documentation
+- **`SKILL.md`**: Comprehensive dispatcher tool documentation
   - YAML frontmatter: name and description for auto-discovery
-  - Function signatures: All sonos_actions.py functions with parameters and return types
-  - Recommended functions: Current, working functions vs deprecated/legacy
-  - Common workflows: Search/play, custom playlists, queue analysis, batch operations
-  - File locations: Search results cache, playlist storage
-  - Best practices: Error handling, initialization patterns, performance tips
+  - Tool descriptions: All 21 CLI tools with arguments and usage examples
+  - Recommended tools: Current, working tools matching MCP functionality
+  - Common workflows: Search/play, custom playlists, queue analysis
+  - Execution patterns: CLI command structure and examples
+  - Best practices: Error handling, two-step patterns, position indexing
+- **`sonos_tool.py`**: Command-line dispatcher
+  - 21 discrete tools matching MCP functionality
+  - Automatic speaker initialization
+  - Standardized error handling and output formatting
+  - 1-indexed positions for user-friendly CLI experience
 
 **Why Skills Over System Prompt:**
 - **Modularity**: Update skill independently of agent code
@@ -274,7 +281,7 @@ sonos_mcp/
 - **`sdk_agent.py`**: Main agent application
   - `SonosSDKAgent` class manages agent lifecycle
   - **MCP mode**: Connects to external MCP server via stdio
-  - **Direct mode**: Uses Bash tool with inline Python code
+  - **Direct mode**: Uses Bash tool to call dispatcher (sonos_tool.py)
   - Handles conversation flow and tool execution
   - Session management and logging
   - No hardcoded skill references (skills auto-discovered)
@@ -339,8 +346,9 @@ The agent supports two execution modes via the `--mode` flag:
 python3 sdk_agent.py              # No flag needed
 python3 sdk_agent.py --mode direct  # Explicit
 ```
-- Uses Bash tool with inline Python code
-- Calls `sonos_actions` functions directly
+- Uses Bash tool to call CLI dispatcher (sonos_tool.py)
+- 21 discrete tools matching MCP functionality
+- Calls `sonos_actions` functions via dispatcher
 - ~15% token savings vs MCP mode
 - Ideal for: Local development, complex workflows, batch operations
 
@@ -553,6 +561,60 @@ Skills can be updated independently without modifying agent code:
 - Provide specific examples for complex workflows
 - Include error handling guidance
 - Reference additional files for detailed information
+
+### Working with the Dispatcher
+
+The direct mode dispatcher (`sonos_tool.py`) provides a stable CLI interface for Sonos control. When adding functionality:
+
+**To add a new tool:**
+
+1. Add function to `sonos/sonos_actions.py` (if needed)
+2. Add tool wrapper to `.claude/skills/sonos-direct-code/sonos_tool.py`:
+   ```python
+   @tool("your_tool_name")
+   def your_tool_name(args):
+       """Description of what this tool does."""
+       if len(args) < 3:
+           return "Error: required_arg required"
+
+       # Parse arguments from sys.argv
+       your_arg = args[2]
+
+       try:
+           # Call sonos_actions function
+           result = sonos_actions.your_function(your_arg)
+           return result if result else "Success message"
+       except Exception as e:
+           return handle_error(e, "your_tool_name")
+   ```
+
+3. Update `.claude/skills/sonos-direct-code/SKILL.md` with tool documentation:
+   - Add to appropriate category section
+   - Include usage example with full command path
+   - Document parameters and expected behavior
+
+4. Test from command line:
+   ```bash
+   .venv/bin/python3 .claude/skills/sonos-direct-code/sonos_tool.py your_tool_name test_arg
+   ```
+
+**Design principles:**
+- **One tool = one action** - No multi-function tools
+- **Accept CLI arguments** - Parse from `sys.argv` (args array)
+- **Return formatted strings** - For agent consumption (not just success/failure)
+- **User-friendly errors** - Specific, actionable error messages
+- **Use 1-indexed positions** - For queue/playlist operations (more intuitive)
+- **Stdout for results, stderr for errors** - Follow CLI conventions
+- **Validate inputs early** - Check required args, ranges, types before calling functions
+
+**Consistency with MCP:**
+When adding dispatcher tools, ensure they match the corresponding MCP tool in `sonos_mcp_server/server.py`:
+- Same tool name
+- Same parameter order
+- Same return format
+- Same validation logic
+
+This maintains parity between direct and MCP modes.
 
 ### Testing
 
