@@ -184,12 +184,22 @@ sonos_mcp/
 
 **Key Files:**
 - **`sonos_actions.py`**: Main implementation of Sonos operations
-  - Music search (tracks, albums)
+  - Music search (tracks, albums) with embedded workflow guidance
   - Queue management (add, remove, play, clear)
   - Playback control (play/pause, next, current track)
   - Playlist management (list, load, save, edit)
   - Speaker management (get/set master speaker)
   - Volume control (adjust, set level, mute/unmute)
+
+  **Design Pattern - Just-in-Time Workflow Guidance:**
+  Search functions (`search_for_track`, `search_for_album`) embed contextual reminders in their output:
+  - Warns that position 1 is not always the best match
+  - Reminds agent to review artist and album details
+  - Provides exact next-step tool name and parameter format
+  - Appears at the decision point (right after seeing search results)
+  - Minimal token cost (~20 tokens) for significant workflow reinforcement
+
+  This creates a self-guiding tool ecosystem where outputs teach correct usage patterns.
 
 - **`config.py`**: User configuration (gitignored, user-created)
   ```python

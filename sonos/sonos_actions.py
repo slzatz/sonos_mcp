@@ -238,7 +238,11 @@ def search_for_track(track):
         json.dump(tracks, file, indent=2)
 
     track_list = "\n".join([f"{t[0]}. {"-".join(list(t[1].values())[:3])}" for t in enumerate(tracks, start=1)])
-    return track_list
+
+    # Add workflow guidance
+    guidance = "\n\n→ Tip: Position 1 is not always the best match. Review artist and album details.\n→ Next: Use add_track_to_queue <position> to add your selection to the queue."
+
+    return track_list + guidance
 
 def play_track_from_search_list(position):
     filename = "sonos_track_uris.json"
@@ -293,7 +297,11 @@ def search_for_album(album):
 
     # Use the returned list to select an album to play and use its position in list to select from the sonos_data.json file
     album_list = "\n".join([f"{a[0]}. {a[1]}" for a in enumerate(albums, start=1)])
-    return album_list
+
+    # Add workflow guidance
+    guidance = "\n\n→ Tip: Review the results carefully to select the right album.\n→ Next: Use add_album_to_queue <position> to add your selection to the queue."
+
+    return album_list + guidance
 
 def add_to_playlist_from_queue(playlist, position):
     queue = master.get_queue()
