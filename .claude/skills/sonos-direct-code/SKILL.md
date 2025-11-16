@@ -3,7 +3,7 @@ name: sonos-direct-code
 description: "[DIRECT MODE - DEFAULT] Direct Python access to Sonos control via dispatcher tool. Use this skill for ALL Sonos requests when running in direct mode (default). Provides 21 discrete tools matching MCP mode functionality."
 ---
 
-# Sonos Direct Code Access Skill
+# Sonos Direct Code
 
 This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py`) for Sonos speaker control. The dispatcher exposes 21 discrete tools that match the MCP server functionality but execute directly without protocol overhead for maximum token efficiency.
 
