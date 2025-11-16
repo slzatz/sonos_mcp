@@ -106,10 +106,29 @@ class SonosSDKAgent:
                 continue_conversation=continue_conversation
             )
         else:  # mode == 'direct'
-            # Direct mode: No MCP server, direct Python execution via Bash tool
+            # Direct mode: Configure tmux MCP server for TUI, use direct Python calls via Bash for Sonos
             self.options = ClaudeAgentOptions(
-                # No mcp_servers - using direct Python calls
-                # No allowed_tools - using Bash tool instead
+                mcp_servers={
+                    "tmux": {
+                        "command": "npx",
+                        "args": ["-y", "tmux-mcp"]
+                    }
+                },
+                allowed_tools=[
+                    # tmux MCP tools for Interactive TUI support
+                    "mcp__tmux__list-sessions",
+                    "mcp__tmux__find-session",
+                    "mcp__tmux__create-session",
+                    "mcp__tmux__list-windows",
+                    "mcp__tmux__create-window",
+                    "mcp__tmux__list-panes",
+                    "mcp__tmux__capture-pane",
+                    "mcp__tmux__execute-command",
+                    "mcp__tmux__split-pane",
+                    "mcp__tmux__kill-session",
+                    "mcp__tmux__kill-window",
+                    "mcp__tmux__kill-pane"
+                ],
                 system_prompt=SONOS_DIRECT_MODE_PROMPT,
                 setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/
                 # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)

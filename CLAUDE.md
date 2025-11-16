@@ -9,6 +9,7 @@ A comprehensive Sonos speaker control system with natural language interface usi
 **Key Features:**
 - Natural language control: "Play Heart of Gold by Neil Young", "Turn it up", "Show my playlists"
 - **Dual execution modes**: MCP server (portable) or direct Python (efficient)
+- **Interactive TUI mode**: Experimental tmux-based interface for stateful search workflows
 - **Agent Skills architecture** with progressive disclosure for efficient context usage
 - Music search across Amazon Music
 - Queue and playlist management
@@ -98,7 +99,7 @@ sonos_mcp/
 │       │   └── references/     # Additional reference materials
 │       │       └── search_tips.md
 │       └── sonos-direct-code/  # Direct mode: Dispatcher tool interface
-│           ├── SKILL.md        # Tool documentation and workflows
+│           ├── SKILL.md        # Tool documentation and workflows (includes TUI guide)
 │           └── sonos_tool.py   # CLI dispatcher (21 discrete tools)
 │
 ├── sonos/                      # Core Sonos control library
@@ -121,6 +122,7 @@ sonos_mcp/
 │   ├── requirements.txt        # Agent dependencies
 │   └── .env                    # ANTHROPIC_API_KEY (gitignored)
 │
+├── sonos_interactive_tui.py    # Interactive TUI for tmux-based workflows
 ├── pyproject.toml              # Project dependencies and metadata
 ├── CLAUDE.md                   # This file
 ├── IMPLEMENTATION_SUMMARY.md   # Technical implementation details
@@ -303,6 +305,67 @@ sonos_mcp/
   - Core principles (proactive, knowledgeable, conversational)
   - Mode-specific execution instructions
   - **Does NOT contain** tool/function descriptions (moved to skills)
+
+### 5. Interactive TUI (`sonos_interactive_tui.py`)
+
+**Purpose**: Experimental interactive terminal UI for search-and-play workflows using tmux.
+
+**Key Innovation**: Demonstrates how AI agents can interact with TUI applications through tmux by:
+- Launching a persistent TUI process
+- Capturing display state with `mcp__tmux__capture-pane`
+- Analyzing visible output
+- Sending keystrokes with `mcp__tmux__execute-command`
+- Repeating the interaction cycle
+
+**Workflow:**
+1. **Search**: Agent sends search query → TUI displays numbered results
+2. **Analyze**: Agent captures and examines results
+3. **Select**: Agent sends track number → TUI adds to queue
+4. **Play Decision**: Agent chooses to play immediately (y) or queue only (n)
+5. **Loop**: TUI returns to search prompt for next operation
+
+**Advantages over CLI Dispatcher:**
+- **Stateful**: Single running process maintains context
+- **Integrated**: Search → select → play in one session
+- **Efficient**: Fewer tool calls for multi-track operations
+- **Natural**: Mirrors human TUI interaction patterns
+
+**When to Use:**
+- Building queues with multiple searches
+- Interactive playlist curation
+- Repetitive search-and-add operations
+- When workflow benefits from maintaining state
+
+**When to Use CLI Dispatcher Instead:**
+- Single operations (volume, current track, etc.)
+- Non-search workflows (list queue, playlists, etc.)
+- Debugging specific tool behavior
+- Operations that don't benefit from state
+
+**Requirements:**
+- **tmux session named `"sonos"`** (create if doesn't exist)
+- tmux MCP server tools (`mcp__tmux__*`)
+- Same dependencies as CLI dispatcher (`sonos_actions`, etc.)
+
+**tmux Session Convention:**
+- Always use session name: `"sonos"`
+- Agent should check if session exists with `mcp__tmux__find-session(name="sonos")`
+- If not found, create with `mcp__tmux__create-session(name="sonos")`
+- Get pane ID from session using `mcp__tmux__list-windows` and `mcp__tmux__list-panes`
+
+**File Location:** Project root (`/home/slzatz/sonos_mcp/sonos_interactive_tui.py`)
+
+**Compatibility:**
+- Saves search results to same JSON files as CLI tools
+- Uses same `sonos_actions` library
+- Can be used alongside CLI dispatcher
+
+**Broader Implications:**
+This pattern can be applied to other TUI applications:
+- Database CLIs (psql, sqlite3, mysql)
+- REPL environments (Python, Node.js, etc.)
+- Interactive command tools (htop, vim with commands, etc.)
+- Any TUI where agents need to observe state and respond dynamically
 
 ## Setup and Installation
 

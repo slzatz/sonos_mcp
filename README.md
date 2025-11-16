@@ -47,6 +47,16 @@ The agent has a number of optional command line arguments:
 - --resume (-r): resume a previous conversation from the session id (recorded to screen and log file)
 - --continue-conversation (-c): continue the previous conversation
 
+**Experimental: Interactive TUI Mode**
+
+For multi-track search workflows, an experimental interactive TUI (`sonos_interactive_tui.py`) is available. When used with tmux, it allows the agent to:
+- Launch a persistent search interface
+- Examine search results before selection
+- Build queues interactively with multiple searches
+- Choose whether to play tracks immediately or just queue them
+
+This demonstrates a new interaction pattern where AI agents can work with terminal UIs by capturing display state and sending keystrokes through tmux. See `CLAUDE.md` for details.
+
 With verbose mode you can see the tool calls that the agent is making.  For example:
 
 🎵 You: What's in playlist favorites   

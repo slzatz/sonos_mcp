@@ -9,28 +9,303 @@ This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py
 
 ## Quick Start
 
-**Execution Pattern:**
+### Two Approaches Available
+
+**1. CLI Dispatcher Tools** (recommended for most operations):
+
+**IMPORTANT: Use the Bash tool directly - DO NOT use tmux for CLI dispatcher commands!**
+
 ```bash
+# Execute with Bash tool (NOT tmux)
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py <tool_name> [args...]
 ```
 
-**Simple Example:**
-```bash
-# Search for a track
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "Heart of Gold Neil Young"
+**2. Interactive TUI** (ONLY when building queues with multiple searches):
 
-# List the queue
+**IMPORTANT: This is the ONLY use case for tmux MCP tools!**
+
+```bash
+# Launch in tmux session (ONLY for interactive TUI)
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/sonos_interactive_tui.py
+```
+
+### CRITICAL: When to Use Each Approach
+
+**Use CLI Dispatcher (with Bash tool - NO tmux):**
+- ✅ Single operations (list_queue, clear_queue, play_from_queeu, volume, etc.)
+- ✅ Do not use for searches because searches require multiple steps: 1) searching for a track or album; 2) placing the track or album on the queue(where it is appended to the end) and 3) optionally playing from the position of the added track or album on the queue.
+- ❌ NEVER use `mcp__tmux__execute-command` to run CLI dispatcher tools
+
+**Use Interactive TUI (with tmux MCP tools):**
+- ✅ for all search-related actions since they are always multi-step
+- ❌ NOT for non-search operations (volume, current track, etc.)
+
+### CLI Dispatcher Examples
+
+**Execute these with the Bash tool directly (NOT tmux):**
+```bash
+
+# List the queue - use Bash tool
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py list_queue
 
-# Set volume
+# Set volume - use Bash tool
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py set_volume 50
 ```
 
 **Key Features:**
 - Speaker automatically initialized (no manual `set_master()` needed)
-- All 21 tools available (same as MCP mode)
+- All 21 tools available (same as MCP mode) but don't use the CLI search tools, use the tmux TUI for searches
 - Standardized error handling
 - Results printed to stdout for agent inspection
+
+## Interactive TUI Approach (Experimental)
+
+**IMPORTANT: tmux MCP tools are ONLY for this Interactive TUI - NOT for CLI dispatcher commands!**
+
+**When to use this:**
+- ALL search operations (track or album searches)
+- User explicitly requests interactive queue building workflow
+- Multiple search-select-add cycles in succession
+
+**When NOT to use this:**
+- Any non-search operations (use CLI dispatcher with Bash tool)
+- You want to run CLI dispatcher commands (NEVER use tmux for that!)
+
+### Overview
+
+The `sonos_interactive_tui.py` script (located in project root) provides a running interactive interface that allows you to:
+1. Search for tracks
+2. See results and select the best match
+3. Add to queue with the option of immediate playback
+4. Loop back for more searches - all within a single running process
+
+**This leverages tmux's ability to:**
+- Launch and keep a TUI running
+- Capture the current display state
+- Send keystrokes to the running application
+- Repeat the interaction cycle
+
+### TUI Workflow Pattern
+
+**IMPORTANT: Session Convention**
+- Always use session name: `"sonos"`
+- Create the session if it doesn't exist
+- Use the first available pane from the session
+
+**Step 0: Ensure tmux session exists**
+
+Before launching the TUI, you MUST ensure a tmux session named "sonos" exists:
+
+```python
+# Check if "sonos" session exists
+mcp__tmux__find-session(name="sonos")
+
+# If it doesn't exist (returns error/not found), create it:
+mcp__tmux__create-session(name="sonos")
+
+# Get the session ID (usually "$0")
+# List windows in the session
+mcp__tmux__list-windows(sessionId="$0")
+
+# Get panes from the first window (usually "@0")
+mcp__tmux__list-panes(windowId="@0")
+
+# This gives you a pane ID (e.g., "%0") to use for the TUI
+```
+
+**Step 1: Launch TUI in tmux pane**
+```python
+# Launch the TUI in the pane you identified in Step 0
+mcp__tmux__execute-command(
+  paneId="%0",  # Use the pane ID from Step 0
+  command="cd /home/slzatz/sonos_mcp && .venv/bin/python3 sonos_interactive_tui.py",
+  rawMode=true
+)
+```
+
+**Step 2: Capture initial state**
+```bash
+mcp__tmux__capture-pane(paneId="%0", lines=40)
+```
+
+You'll see:
+```
+================================================================================
+Sonos Interactive Track Search
+================================================================================
+Commands: Type search query, track number, or 'quit' to exit
+
+Initializing Sonos speaker...
+Connected to: Office2
+
+Search:
+```
+
+**Step 3: Send search query**
+```bash
+mcp__tmux__execute-command(
+  paneId="%0",
+  command="Heart of Gold Neil Young",
+  rawMode=true
+)
+```
+
+**Step 4: Capture search results**
+```bash
+mcp__tmux__capture-pane(paneId="%0", lines=60)
+```
+
+You'll see numbered results:
+```
+Found 50 results:
+--------------------------------------------------------------------------------
+1. Heart of Gold - Neil Young - Harvest
+2. Heart of Gold - Old Man With A Heart... - Neil Young We Miss Streaming You
+3. Heart of Gold (Cover) - ...
+...
+--------------------------------------------------------------------------------
+
+Select track (1-50) or 'q' to search again:
+```
+
+**Step 5: Analyze results and send selection**
+
+Examine the results and pick the best match. Send the track number:
+
+```bash
+mcp__tmux__execute-command(
+  paneId="%0",
+  command="1",
+  rawMode=true
+)
+```
+
+**Step 6: Capture queue confirmation**
+```bash
+mcp__tmux__capture-pane(paneId="%0", lines=20)
+```
+
+You'll see:
+```
+Adding track 1 to queue...
+Track added at position 12.
+Play now? (y/n):
+```
+
+**Step 7: Choose whether to play immediately**
+
+```bash
+# To play now:
+mcp__tmux__execute-command(paneId="%0", command="y", rawMode=true)
+
+# Or just queue it:
+mcp__tmux__execute-command(paneId="%0", command="n", rawMode=true)
+```
+
+**Step 8: Loop continues**
+
+After your choice, the TUI returns to the search prompt:
+```
+Now playing track 12!
+
+================================================================================
+
+Search:
+```
+
+You can now search for another track, or quit:
+```bash
+mcp__tmux__execute-command(paneId="%0", command="quit", rawMode=true)
+```
+
+### TUI State Management
+
+The TUI maintains state across operations:
+- Search results are cached (saved to `~/.sonos/search_results/track_search.json`)
+- Queue position tracking (automatically counts queue length)
+- Continuous loop until you explicitly quit
+
+### TUI Commands
+
+While in the TUI, you can send:
+- **Search query** (any text at "Search:" prompt)
+- **Track number** (1-N at "Select track:" prompt)
+- **"q"** or **"quit"** (to exit TUI)
+- **"y"** or **"n"** (at "Play now?" prompt)
+
+### TUI vs CLI Dispatcher Comparison
+
+| Feature | Interactive TUI | CLI Dispatcher |
+|---------|----------------|----------------|
+| **Process lifecycle** | Runs continuously | Tool invoked per operation |
+| **State** | Maintains state | Stateless (reads from files) |
+| **Search workflow** | Integrated (search → select → play) | Manual steps (separate tool calls) |
+| **Best for** | Multiple searches, queue building | Single operations, specific tasks |
+| **Token efficiency** | High (fewer tool calls) | Moderate (each operation = tool call) |
+| **Requires tmux** | Yes | No |
+| **Control flow** | Sequential prompts | Explicit tool selection |
+
+### TUI Implementation Details
+
+**File Location:** `/home/slzatz/sonos_mcp/sonos_interactive_tui.py`
+
+**tmux Requirements:**
+- **Session name convention**: `"sonos"` (always use this name)
+- **Automatic creation**: Create the session if it doesn't exist with `mcp__tmux__create-session`
+- **Session check**: Always verify session exists with `mcp__tmux__find-session` before use
+- **Pane ID**: Get from `mcp__tmux__list-panes` (typically `"%0"` for first pane)
+
+**Dependencies:**
+- Uses `sonos_actions` library for all Sonos operations
+- Saves search results to same JSON files as CLI tools
+- Compatible with existing search result caching
+- Requires tmux MCP server tools (`mcp__tmux__*`)
+
+**Features:**
+- Clear prompts designed for tmux capture
+- Error handling with user-friendly messages
+- Automatic speaker initialization on startup
+- Queue position tracking for accurate playback
+
+### Example: Building a Queue with TUI
+
+Here's a complete example of using the TUI to build a queue of multiple tracks:
+
+```python
+# Step 0: Ensure "sonos" tmux session exists
+mcp__tmux__find-session(name="sonos")  # Check if exists
+# If not found, create it:
+mcp__tmux__create-session(name="sonos")
+# Get pane ID from session
+mcp__tmux__list-windows(sessionId="$0")
+mcp__tmux__list-panes(windowId="@0")  # Get pane ID like "%0"
+
+# Step 1: Launch TUI in the sonos session pane
+mcp__tmux__execute-command(paneId="%0", command="cd /home/slzatz/sonos_mcp && .venv/bin/python3 sonos_interactive_tui.py", rawMode=true)
+
+# Search for first artist
+execute_command(paneId="%0", command="Neil Young Heart of Gold", rawMode=true)
+capture_pane(paneId="%0")  # See results
+execute_command(paneId="%0", command="1", rawMode=true)  # Select track 1
+execute_command(paneId="%0", command="n", rawMode=true)  # Queue, don't play yet
+
+# Search for second artist
+execute_command(paneId="%0", command="Bob Dylan Tangled Up in Blue", rawMode=true)
+capture_pane(paneId="%0")  # See results
+execute_command(paneId="%0", command="2", rawMode=true)  # Select track 2
+execute_command(paneId="%0", command="n", rawMode=true)  # Queue, don't play yet
+
+# Search for third artist
+execute_command(paneId="%0", command="Leonard Cohen Suzanne", rawMode=true)
+capture_pane(paneId="%0")  # See results
+execute_command(paneId="%0", command="1", rawMode=true)  # Select track 1
+execute_command(paneId="%0", command="y", rawMode=true)  # Queue and start playing!
+
+# Exit TUI
+execute_command(paneId="%0", command="quit", rawMode=true)
+```
+
+This builds a 3-track queue and starts playback - all within one continuous TUI session.
 
 ## Critical Workflow Rules
 
