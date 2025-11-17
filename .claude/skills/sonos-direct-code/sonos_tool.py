@@ -12,6 +12,9 @@ but executes directly without MCP protocol overhead for token efficiency.
 import sys
 import json
 import os
+import subprocess
+import signal
+import time
 from pathlib import Path
 
 # Add project root to path for imports
@@ -78,30 +81,30 @@ def set_master_speaker(args):
 
 
 # Music Search Tools
-
-@tool("search_for_track")
-def search_for_track(args):
-    """Search for music tracks by title, artist, or both."""
-    if len(args) < 3:
-        return "Error: query required"
-    query = args[2]
-    try:
-        return sonos_actions.search_for_track(query)
-    except Exception as e:
-        return handle_error(e, "search_for_track")
-
-
-@tool("search_for_album")
-def search_for_album(args):
-    """Search for music albums by title or artist."""
-    if len(args) < 3:
-        return "Error: query required"
-    query = args[2]
-    try:
-        return sonos_actions.search_for_album(query)
-    except Exception as e:
-        return handle_error(e, "search_for_album")
-
+# Use tmux and sonos_interactive_tui for all searches
+#@tool("search_for_track")
+#def search_for_track(args):
+#    """Search for music tracks by title, artist, or both."""
+#    if len(args) < 3:
+#        return "Error: query required"
+#    query = args[2]
+#    try:
+#        return sonos_actions.search_for_track(query)
+#    except Exception as e:
+#        return handle_error(e, "search_for_track")
+#
+#
+#@tool("search_for_album")
+#def search_for_album(args):
+#    """Search for music albums by title or artist."""
+#    if len(args) < 3:
+#        return "Error: query required"
+#    query = args[2]
+#    try:
+#        return sonos_actions.search_for_album(query)
+#    except Exception as e:
+#        return handle_error(e, "search_for_album")
+#
 
 # Queue Management Tools
 
@@ -443,6 +446,196 @@ def create_native_sonos_playlist_from_local(args):
         return handle_error(e, "create_native_sonos_playlist_from_local")
 
 
+# TUI Lifecycle Management Tools
+
+@tool("tui_status")
+def tui_status(args):
+    """Check TUI running status and current state."""
+    try:
+        state_file = Path.home() / ".sonos" / "tui_state.json"
+
+        # Check if state file exists
+        if not state_file.exists():
+            return json.dumps({
+                "running": False,
+                "status": "not_running",
+                "message": "TUI not running (no state file found)"
+            }, indent=2)
+
+        # Read state file
+        with open(state_file) as f:
+            state = json.load(f)
+
+        # Check if status is already "stopped"
+        if state.get("status") == "stopped":
+            return json.dumps({
+                "running": False,
+                "status": "stopped",
+                "message": "TUI is stopped"
+            }, indent=2)
+
+        # Verify process is actually running
+        pid = state.get("pid")
+        if pid:
+            try:
+                # Check if process exists (os.kill with signal 0 doesn't kill, just checks)
+                os.kill(pid, 0)
+                process_alive = True
+            except (OSError, ProcessLookupError):
+                process_alive = False
+        else:
+            process_alive = False
+
+        # Verify tmux pane exists
+        pane_id = state.get("pane_id", "unknown")
+        pane_alive = False
+        if pane_id != "unknown":
+            try:
+                result = subprocess.run(
+                    ["tmux", "list-panes", "-a", "-F", "#{pane_id}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                pane_alive = pane_id in result.stdout
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pane_alive = False
+
+        # Determine final status
+        if process_alive and pane_alive:
+            return json.dumps({
+                "running": True,
+                "status": state.get("status", "running"),
+                "current_prompt": state.get("current_prompt", "unknown"),
+                "pid": pid,
+                "pane_id": pane_id,
+                "last_updated": state.get("last_updated", "unknown")
+            }, indent=2)
+        else:
+            return json.dumps({
+                "running": False,
+                "status": "stale",
+                "message": f"TUI state file exists but process/pane not found (process_alive={process_alive}, pane_alive={pane_alive})",
+                "pid": pid,
+                "pane_id": pane_id
+            }, indent=2)
+
+    except Exception as e:
+        return handle_error(e, "tui_status")
+
+
+@tool("tui_start")
+def tui_start(args):
+    """Start TUI in tmux session 'sonos'."""
+    try:
+        # First check if already running
+        status_result = tui_status(args)
+        status_data = json.loads(status_result)
+
+        if status_data.get("running"):
+            return f"Error: TUI already running on pane {status_data.get('pane_id')}"
+
+        # Check if tmux session 'sonos' exists
+        session_check = subprocess.run(
+            ["tmux", "has-session", "-t", "sonos"],
+            capture_output=True,
+            timeout=2
+        )
+        session_exists = session_check.returncode == 0
+
+        # Create session if needed
+        if not session_exists:
+            subprocess.run(
+                ["tmux", "new-session", "-d", "-s", "sonos"],
+                check=True,
+                timeout=5
+            )
+
+        # Get the pane ID for the sonos session
+        pane_result = subprocess.run(
+            ["tmux", "list-panes", "-t", "sonos", "-F", "#{pane_id}"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2
+        )
+        pane_id = pane_result.stdout.strip().split('\n')[0]
+
+        # Launch TUI in the tmux pane
+        tui_script = Path(__file__).parent / "sonos_interactive_tui.py"
+        python_exe = sys.executable
+
+        subprocess.run(
+            ["tmux", "send-keys", "-t", pane_id, f"{python_exe} {tui_script}", "Enter"],
+            check=True,
+            timeout=2
+        )
+
+        # Wait briefly for TUI to start and write state file
+        time.sleep(1)
+
+        # Verify it started
+        verify_result = tui_status(args)
+        verify_data = json.loads(verify_result)
+
+        if verify_data.get("running"):
+            return f"TUI started successfully on pane {pane_id}"
+        else:
+            return f"Warning: TUI launch command sent to pane {pane_id}, but status check failed. Check manually."
+
+    except subprocess.TimeoutExpired:
+        return "Error: tmux command timed out"
+    except FileNotFoundError:
+        return "Error: tmux not found. Please install tmux."
+    except subprocess.CalledProcessError as e:
+        return f"Error: tmux command failed: {e}"
+    except Exception as e:
+        return handle_error(e, "tui_start")
+
+
+@tool("tui_stop")
+def tui_stop(args):
+    """Stop running TUI gracefully."""
+    try:
+        # Check if TUI is running
+        status_result = tui_status(args)
+        status_data = json.loads(status_result)
+
+        if not status_data.get("running"):
+            return "TUI not running"
+
+        pane_id = status_data.get("pane_id")
+        if not pane_id or pane_id == "unknown":
+            return "Error: Cannot determine TUI pane ID"
+
+        # Send quit command to TUI
+        subprocess.run(
+            ["tmux", "send-keys", "-t", pane_id, "quit", "Enter"],
+            check=True,
+            timeout=2
+        )
+
+        # Wait for graceful shutdown (up to 3 seconds)
+        for _ in range(6):
+            time.sleep(0.5)
+            verify_result = tui_status(args)
+            verify_data = json.loads(verify_result)
+            if not verify_data.get("running"):
+                return "TUI stopped successfully"
+
+        # If still running after 3 seconds, report issue
+        return "Warning: TUI may still be running. Sent quit command but process did not stop within 3 seconds."
+
+    except subprocess.TimeoutExpired:
+        return "Error: tmux command timed out"
+    except FileNotFoundError:
+        return "Error: tmux not found. Please install tmux."
+    except subprocess.CalledProcessError as e:
+        return f"Error: tmux command failed: {e}"
+    except Exception as e:
+        return handle_error(e, "tui_stop")
+
+
 def main():
     """Main dispatcher entry point."""
     if len(sys.argv) < 2:
@@ -461,8 +654,9 @@ def main():
             print(f"  {name}", file=sys.stderr)
         sys.exit(1)
 
-    # Initialize speaker (except for get_master_speaker which checks connection)
-    if tool_name != "get_master_speaker":
+    # Initialize speaker (except for tools that don't need speaker connection)
+    no_speaker_tools = {"get_master_speaker", "tui_status", "tui_start", "tui_stop"}
+    if tool_name not in no_speaker_tools:
         initialize_speaker()
 
     # Execute tool

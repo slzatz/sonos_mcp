@@ -43,7 +43,7 @@ Sonos Speakers (network)
 - When portability matters
 - Standard tool-based workflows
 
-**Context Overhead:** ~17% (~34k tokens for 21 MCP tool definitions)
+**Context Overhead:** ~17% (~34k tokens for 24 MCP tool definitions: 21 Sonos + 3 TUI lifecycle)
 
 ### Direct Mode (Efficient - Default)
 ```
@@ -100,7 +100,7 @@ sonos_mcp/
 │       │       └── search_tips.md
 │       └── sonos-direct-code/  # Direct mode: Dispatcher tool interface
 │           ├── SKILL.md        # Tool documentation and workflows (includes TUI guide)
-│           └── sonos_tool.py   # CLI dispatcher (21 discrete tools)
+│           └── sonos_tool.py   # CLI dispatcher (22 active tools: 19 Sonos + 3 TUI lifecycle)
 │
 ├── sonos/                      # Core Sonos control library
 │   ├── __init__.py
@@ -111,7 +111,7 @@ sonos_mcp/
 │   └── cli.py                  # Legacy CLI (not used by agent)
 │
 ├── sonos_mcp_server/           # Standalone MCP Server
-│   ├── server.py               # FastMCP server with 21 tools
+│   ├── server.py               # FastMCP server with 24 tools (21 Sonos + 3 TUI lifecycle)
 │   ├── requirements.txt        # MCP SDK dependencies
 │   ├── __init__.py
 │   └── README.md               # Server documentation
@@ -127,6 +127,12 @@ sonos_mcp/
 ├── CLAUDE.md                   # This file
 ├── IMPLEMENTATION_SUMMARY.md   # Technical implementation details
 └── README.md                   # User-facing documentation
+
+# Runtime state (created at runtime, not in repo)
+~/.sonos/
+├── playlists/                  # Local playlist JSON files
+├── search_results/             # Cached search results from TUI
+└── tui_state.json              # TUI lifecycle state (status, pid, pane_id, current_prompt)
 ```
 
 ## Core Components
@@ -145,7 +151,7 @@ sonos_mcp/
 **Sonos Control Skill** (`.claude/skills/sonos-control/`) - Used in **MCP mode**:
 - **`SKILL.md`**: Comprehensive MCP tool documentation
   - YAML frontmatter: name and description for auto-discovery
-  - Tool descriptions: All 21 MCP tools with parameters
+  - Tool descriptions: All 24 MCP tools with parameters (21 Sonos + 3 TUI lifecycle)
   - Workflows: Step-by-step guides (basic playback, custom mixes, playlists)
   - Advanced patterns: Live performances, multi-room control, error handling
   - Best practices: Selection logic, ambiguity resolution, natural responses
@@ -155,16 +161,18 @@ sonos_mcp/
 **Sonos Direct Code Skill** (`.claude/skills/sonos-direct-code/`) - Used in **Direct mode**:
 - **`SKILL.md`**: Comprehensive dispatcher tool documentation
   - YAML frontmatter: name and description for auto-discovery
-  - Tool descriptions: All 21 CLI tools with arguments and usage examples
+  - Tool descriptions: 22 CLI tools with arguments and usage examples (19 Sonos + 3 TUI lifecycle)
   - Recommended tools: Current, working tools matching MCP functionality
   - Common workflows: Search/play, custom playlists, queue analysis
   - Execution patterns: CLI command structure and examples
   - Best practices: Error handling, two-step patterns, position indexing
+  - TUI lifecycle management: tui_status, tui_start, tui_stop tools
 - **`sonos_tool.py`**: Command-line dispatcher
-  - 21 discrete tools matching MCP functionality
-  - Automatic speaker initialization
+  - 22 active tools: 19 Sonos tools (2 search tools commented out) + 3 TUI lifecycle tools
+  - Automatic speaker initialization (except for TUI lifecycle tools)
   - Standardized error handling and output formatting
   - 1-indexed positions for user-friendly CLI experience
+  - State file coordination for TUI lifecycle management (~/.sonos/tui_state.json)
 
 **Why Skills Over System Prompt:**
 - **Modularity**: Update skill independently of agent code
@@ -230,7 +238,7 @@ sonos_mcp/
 - Runs as separate process (launched by agent)
 - Auto-exits when client disconnects
 
-**Available Tools (21 total):**
+**Available Tools (24 total):**
 
 *Speaker Management (2 tools):*
 - `get_master_speaker` - Get current master speaker name
@@ -266,6 +274,11 @@ sonos_mcp/
 - `remove_track_from_playlist` - Remove track from local playlist
 - `list_native_sonos_playlists` - Display all native Sonos playlists stored on Sonos system
 - `create_native_sonos_playlist_from_local` - Convert local playlist to native Sonos playlist (accessible in Sonos app)
+
+*TUI Lifecycle Management (3 tools):*
+- `tui_status` - Check TUI running status (returns JSON state)
+- `tui_start` - Start TUI in tmux session (auto-creates session if needed)
+- `tui_stop` - Gracefully stop running TUI instance
 
 **Server Initialization:**
 - Connects to master speaker with retry logic (up to 10 attempts)
@@ -353,7 +366,49 @@ sonos_mcp/
 - If not found, create with `mcp__tmux__create-session(name="sonos")`
 - Get pane ID from session using `mcp__tmux__list-windows` and `mcp__tmux__list-panes`
 
-**File Location:** Project root (`/home/slzatz/sonos_mcp/sonos_interactive_tui.py`)
+**TUI Lifecycle Management:**
+
+The TUI can be managed programmatically using three lifecycle tools in the CLI dispatcher (`sonos_tool.py`):
+
+- **`tui_status`**: Check if TUI is running and get current state
+  - Returns JSON with: `status`, `current_prompt`, `pid`, `pane_id`, `last_updated`
+  - State file: `~/.sonos/tui_state.json`
+  - Use this to verify TUI availability before attempting interaction
+  - Performs health checks: validates both PID exists and tmux pane is alive
+
+- **`tui_start`**: Launch TUI in tmux session
+  - Auto-creates tmux session named "sonos" if it doesn't exist
+  - Starts TUI process and returns pane ID
+  - Updates state file with running status
+  - Returns error if TUI already running (prevents duplicate instances)
+  - Waits 1 second for initialization and verifies successful start
+
+- **`tui_stop`**: Gracefully terminate TUI
+  - Sends 'quit' command to TUI for clean shutdown
+  - Updates state file with stopped status
+  - Waits up to 3 seconds for graceful exit
+  - Safer than killing the process directly
+
+**State File Format** (`~/.sonos/tui_state.json`):
+```json
+{
+  "status": "running",           // "running" or "stopped"
+  "current_prompt": "search",    // "search", "select", or "play"
+  "pid": 12345,                  // TUI process ID
+  "pane_id": "%0",               // tmux pane identifier
+  "last_updated": "2025-01-16T10:30:45.123456"
+}
+```
+
+The state file is updated at key points:
+- TUI startup (status: "running", prompt: "search")
+- Prompt transitions (search → select → play → search)
+- TUI exit (status: "stopped")
+- State written atomically (temp file + rename) to prevent corruption
+
+**File Locations:**
+- TUI Script: `/home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_interactive_tui.py`
+- State File: `~/.sonos/tui_state.json` (tracks running status and current prompt)
 
 **Compatibility:**
 - Saves search results to same JSON files as CLI tools
@@ -689,6 +744,22 @@ When adding dispatcher tools, ensure they match the corresponding MCP tool in `s
 
 This maintains parity between direct and MCP modes.
 
+**TUI Lifecycle Tools:**
+
+The dispatcher includes three special tools for managing the interactive TUI:
+- Not part of the core 21 Sonos tools
+- Enable programmatic TUI lifecycle management
+- Use state file (`~/.sonos/tui_state.json`) for coordination
+- Allow agents to check TUI status, start, and stop TUI programmatically
+- Bridge the gap between stateless CLI operations and stateful TUI workflows
+- Do not require speaker initialization (excluded from `no_speaker_tools` set)
+
+These tools simplify TUI session management compared to manual tmux commands, providing:
+- Health checking (PID + tmux pane verification)
+- Atomic state file updates
+- Graceful shutdown mechanisms
+- Error prevention (e.g., detecting already-running instances)
+
 ### Testing
 
 **Test server startup:**
@@ -987,4 +1058,4 @@ Should show all Sonos speakers on network.
 - MCP Inspector (for testing)
 - Any MCP-compatible client
 
-All 21 tools are functional and tested end-to-end.
+All 24 MCP tools (21 Sonos + 3 TUI lifecycle) are functional and tested. The CLI dispatcher provides 22 active tools (19 Sonos + 3 TUI lifecycle, with 2 search tools commented out in favor of the TUI-based search workflow).

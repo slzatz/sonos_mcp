@@ -99,7 +99,7 @@ class SonosSDKAgent:
                     "mcp__sonos__create_native_sonos_playlist_from_local"
                 ],
                 system_prompt=SONOS_SYSTEM_PROMPT,
-                setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/
+                setting_sources=["project"],  # Enable loading of project-level skills from ~/.claude/
                 # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
                 permission_mode="bypassPermissions",  # Auto-execute tools without prompting
                 resume=resume_session if resume_session else None,
@@ -130,7 +130,7 @@ class SonosSDKAgent:
                     "mcp__tmux__kill-pane"
                 ],
                 system_prompt=SONOS_DIRECT_MODE_PROMPT,
-                setting_sources=["user"],  # Enable loading of user-level skills from ~/.claude/
+                setting_sources=["project"],  # Enable loading of project-level skills from ~/.claude/
                 # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
                 permission_mode="bypassPermissions",  # Auto-execute tools without prompting
                 resume=resume_session if resume_session else None,

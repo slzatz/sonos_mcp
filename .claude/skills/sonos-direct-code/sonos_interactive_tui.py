@@ -8,6 +8,8 @@ Supports search → select → add to queue → optional immediate playback work
 
 import sys
 import json
+import os
+from datetime import datetime
 from pathlib import Path
 
 # Add project root to path for imports
@@ -24,6 +26,8 @@ class SonosInteractiveTUI:
         self.search_results = []
         self.search_results_file = Path.home() / ".sonos" / "search_results" / "track_search.json"
         self.search_results_file.parent.mkdir(parents=True, exist_ok=True)
+        self.state_file = Path.home() / ".sonos" / "tui_state.json"
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
 
     def initialize_speaker(self):
         """Initialize speaker connection."""
@@ -37,6 +41,27 @@ class SonosInteractiveTUI:
             print(f"Error connecting to speaker: {e}")
             print("Please check your configuration and try again.")
             return False
+
+    def write_state(self, status="running", current_prompt="search"):
+        """Write current TUI state to state file."""
+        try:
+            state = {
+                "status": status,
+                "current_prompt": current_prompt,
+                "pid": os.getpid(),
+                "pane_id": os.getenv("TMUX_PANE", "unknown"),
+                "last_updated": datetime.now().isoformat()
+            }
+
+            # Write atomically using temp file
+            temp_file = self.state_file.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
+                json.dump(state, f, indent=2)
+            temp_file.replace(self.state_file)
+
+        except Exception as e:
+            # Don't crash TUI if state file write fails
+            print(f"Warning: Could not write state file: {e}", file=sys.stderr)
 
     def display_search_results(self, results):
         """Display numbered search results."""
@@ -148,6 +173,9 @@ class SonosInteractiveTUI:
         if not self.initialize_speaker():
             return
 
+        # Write initial state after successful initialization
+        self.write_state(status="running", current_prompt="search")
+
         while True:
             try:
                 # State 1: Get search query
@@ -155,17 +183,22 @@ class SonosInteractiveTUI:
 
                 if query.lower() in ['q', 'quit', 'exit']:
                     print("\nGoodbye!")
+                    self.write_state(status="stopped", current_prompt="search")
                     break
 
                 # Execute search
                 if not self.handle_search(query):
                     continue
 
+                # Update state after successful search
+                self.write_state(status="running", current_prompt="select")
+
                 # State 2: Get track selection
                 selection = input(f"\nSelect track (1-{len(self.search_results)}) or 'q' to search again: ").strip()
 
                 if selection.lower() in ['q', 'quit']:
                     print("Returning to search...\n")
+                    self.write_state(status="running", current_prompt="search")
                     continue
 
                 # Process selection
@@ -173,22 +206,32 @@ class SonosInteractiveTUI:
                 if not queue_position:
                     continue
 
+                # Update state before play decision
+                self.write_state(status="running", current_prompt="play")
+
                 # State 3: Ask about immediate playback
                 play_choice = input("Play now? (y/n): ").strip()
 
                 self.handle_play_choice(play_choice, queue_position)
 
+                # Return to search state after completing the workflow
+                self.write_state(status="running", current_prompt="search")
+
                 print("\n" + "=" * 80 + "\n")
 
             except KeyboardInterrupt:
                 print("\n\nInterrupted. Exiting...")
+                self.write_state(status="stopped", current_prompt="search")
                 break
             except EOFError:
                 print("\n\nEOF received. Exiting...")
+                self.write_state(status="stopped", current_prompt="search")
                 break
             except Exception as e:
                 print(f"\nUnexpected error: {e}")
                 print("Returning to search...\n")
+                # Keep running on unexpected errors, just reset to search state
+                self.write_state(status="running", current_prompt="search")
 
 
 def main():

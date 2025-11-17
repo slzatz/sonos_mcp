@@ -1,11 +1,11 @@
 ---
 name: sonos-direct-code
-description: "[DIRECT MODE - DEFAULT] Direct Python access to Sonos control via dispatcher tool. Use this skill for ALL Sonos requests when running in direct mode (default). Provides 21 discrete tools matching MCP mode functionality."
+description: "[DIRECT MODE - DEFAULT] Direct Python access to Sonos control via dispatcher tool. Use this skill for ALL Sonos requests when running in direct mode (default). Provides 21 discrete tools matching MCP mode functionality and 3 additional tools to manage tmux access to sonos_interactive_tui.py."
 ---
 
 # Sonos Direct Code Access Skill
 
-This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py`) for Sonos speaker control. The dispatcher exposes 21 discrete tools that match the MCP server functionality but execute directly without protocol overhead for maximum token efficiency.
+This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py`) for Sonos speaker control. The dispatcher exposes 21 discrete tools that match the MCP server functionality plus 3 additional tools for managing the Interactive TUI (`sonos_interactive_tui.py`), all executing directly without protocol overhead for maximum token efficiency.
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py
 
 ```bash
 # Launch in tmux session (ONLY for interactive TUI)
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/sonos_interactive_tui.py
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_interactive_tui.py
 ```
 
 ### CRITICAL: When to Use Each Approach
@@ -57,6 +57,67 @@ This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py
 - All 21 tools available (same as MCP mode) but don't use the CLI search tools, use the tmux TUI for searches
 - Standardized error handling
 - Results printed to stdout for agent inspection
+
+### TUI Lifecycle Management
+
+**NEW: Three convenience tools for managing the Interactive TUI**
+
+Before working with the Interactive TUI (`sonos_interactive_tui.py`), use these tools to manage its lifecycle:
+
+**1. Check if TUI is running:**
+```bash
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py tui_status
+```
+
+Returns JSON with:
+- `running`: true/false
+- `status`: "running", "stopped", "not_running", or "stale"
+- `current_prompt`: "search", "select", or "play" (if running)
+- `pid`: Process ID (if running)
+- `pane_id`: tmux pane ID (if running)
+
+**2. Start TUI in background:**
+```bash
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py tui_start
+```
+
+- Automatically creates tmux session "sonos" if needed
+- Launches TUI in the session
+- Returns pane ID on success
+- Returns error if TUI already running
+
+**3. Stop TUI gracefully:**
+```bash
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py tui_stop
+```
+
+- Sends quit command to TUI
+- Waits up to 3 seconds for shutdown
+- Returns success/failure status
+
+**Recommended Workflow:**
+1. Always call `tui_status` first to check if TUI is already running
+2. If not running, call `tui_start` to launch it
+3. Use the returned pane ID with tmux MCP tools for interaction
+4. When done, optionally call `tui_stop` to clean up
+
+**Example:**
+```bash
+# Step 1: Check status
+/home/slzatz/sonos_mcp/.venv/bin/python3 .../sonos_tool.py tui_status
+# Returns: {"running": false, "status": "not_running", ...}
+
+# Step 2: Start TUI
+/home/slzatz/sonos_mcp/.venv/bin/python3 .../sonos_tool.py tui_start
+# Returns: "TUI started successfully on pane %0"
+
+# Step 3: Interact via tmux MCP tools (see below)
+mcp__tmux__capture-pane(paneId="%0", lines=40)
+mcp__tmux__execute-command(paneId="%0", command="search query", rawMode=true)
+
+# Step 4: Stop when done
+/home/slzatz/sonos_mcp/.venv/bin/python3 .../sonos_tool.py tui_stop
+```
 
 ## Interactive TUI Approach (Experimental)
 
@@ -118,7 +179,7 @@ mcp__tmux__list-panes(windowId="@0")
 # Launch the TUI in the pane you identified in Step 0
 mcp__tmux__execute-command(
   paneId="%0",  # Use the pane ID from Step 0
-  command="cd /home/slzatz/sonos_mcp && .venv/bin/python3 sonos_interactive_tui.py",
+  command="cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py",
   rawMode=true
 )
 ```
@@ -247,7 +308,7 @@ While in the TUI, you can send:
 
 ### TUI Implementation Details
 
-**File Location:** `/home/slzatz/sonos_mcp/sonos_interactive_tui.py`
+**File Location:** `/home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_interactive_tui.py`
 
 **tmux Requirements:**
 - **Session name convention**: `"sonos"` (always use this name)
@@ -281,7 +342,7 @@ mcp__tmux__list-windows(sessionId="$0")
 mcp__tmux__list-panes(windowId="@0")  # Get pane ID like "%0"
 
 # Step 1: Launch TUI in the sonos session pane
-mcp__tmux__execute-command(paneId="%0", command="cd /home/slzatz/sonos_mcp && .venv/bin/python3 sonos_interactive_tui.py", rawMode=true)
+mcp__tmux__execute-command(paneId="%0", command="cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py", rawMode=true)
 
 # Search for first artist
 execute_command(paneId="%0", command="Neil Young Heart of Gold", rawMode=true)
@@ -418,9 +479,9 @@ The two-step pattern is not required for operations that don't involve searching
 - Want standard protocol compliance
 - Multi-client scenarios
 
-## Available Tools (21 Total)
+## Available Tools (24 Total)
 
-The dispatcher provides these tools. All tools automatically initialize the speaker connection.
+The dispatcher provides these tools. Most tools automatically initialize the speaker connection (TUI lifecycle tools do not require speaker connection).
 
 ### Speaker Management (2 tools)
 
@@ -636,6 +697,86 @@ Create native Sonos playlist from local playlist file.
 **Usage:**
 ```bash
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py create_native_sonos_playlist_from_local favorites "My Favorites"
+```
+
+### TUI Lifecycle Management (3 tools)
+
+These tools manage the Interactive TUI (`sonos_interactive_tui.py`) process lifecycle. Unlike other tools, these do NOT require speaker initialization.
+
+#### `tui_status`
+Check if the Interactive TUI is running and get its current state.
+
+**Usage:**
+```bash
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py tui_status
+```
+
+**Returns:** JSON with status information:
+```json
+{
+  "running": true,
+  "status": "running",
+  "current_prompt": "search",
+  "pid": 12345,
+  "pane_id": "%0",
+  "last_updated": "2025-01-16T10:30:00"
+}
+```
+
+**Possible status values:**
+- `"not_running"`: TUI not running (no state file found)
+- `"stopped"`: TUI was stopped gracefully
+- `"running"`: TUI is currently active
+- `"stale"`: State file exists but process/pane not found
+
+#### `tui_start`
+Start the Interactive TUI in tmux session "sonos".
+
+**Usage:**
+```bash
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py tui_start
+```
+
+**Behavior:**
+- Creates tmux session "sonos" if it doesn't exist
+- Launches TUI in that session's first pane
+- Waits 1 second for initialization
+- Verifies TUI started successfully
+- Returns pane ID (e.g., "%0") on success
+- Returns error if TUI already running
+
+**Example output:**
+```
+TUI started successfully on pane %0
+```
+
+**Error if already running:**
+```
+Error: TUI already running on pane %0
+```
+
+#### `tui_stop`
+Stop the running Interactive TUI gracefully.
+
+**Usage:**
+```bash
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py tui_stop
+```
+
+**Behavior:**
+- Checks if TUI is running via `tui_status`
+- Sends "quit" command to TUI via tmux
+- Waits up to 3 seconds for graceful shutdown
+- Verifies process stopped
+
+**Example output:**
+```
+TUI stopped successfully
+```
+
+**If not running:**
+```
+TUI not running
 ```
 
 ## Common Workflows
