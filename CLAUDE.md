@@ -50,7 +50,9 @@ Sonos Speakers (network)
 User/Client
     ↓
 Claude Agent SDK (claude_sdk_agent/)
-    ↓ Bash tool → Dispatcher Tool (sonos_tool.py)
+    ↓ Bash tool → CLI Dispatchers:
+    │   ├── sonos_tool.py (22 Sonos tools)
+    │   └── tmux_tool.py (6 tmux tools for TUI)
     ↓ Direct Python imports
 Sonos Actions Library (sonos/)
     ↓ SoCo Library
@@ -62,9 +64,10 @@ Sonos Speakers (network)
 - Complex workflows requiring multiple operations
 - Performance-critical operations
 - Batch operations
+- TUI-based interactive search workflows
 
 **Context Overhead:** ~2.5% (~5k tokens for skill metadata)
-**Token Savings:** ~15% compared to MCP mode
+**Token Savings:** ~15% compared to MCP mode (~29k tokens saved from no MCP tools + tmux_tool.py replacing tmux MCP)
 
 ### Switching Between Modes
 
@@ -84,9 +87,10 @@ python3 sdk_agent.py --mode mcp -p "play music"
 1. **Dual Execution**: Choose between MCP (portable) or direct (efficient)
 2. **Separation of Concerns**: MCP server runs as independent process when needed
 3. **Reusability**: MCP server works with any MCP-compatible client
-4. **Direct Efficiency**: Skip protocol overhead for local development
+4. **Direct Efficiency**: Skip protocol overhead for local development using CLI dispatchers
 5. **Standard Protocol**: Follows official MCP specification
 6. **Modular Knowledge**: Agent Skills provide domain expertise via progressive disclosure
+7. **CLI Dispatcher Pattern**: Direct mode uses lightweight Python CLIs (sonos_tool.py, tmux_tool.py) for ~1,500-1,800 token savings vs MCP
 
 ## Project Structure
 
@@ -98,9 +102,12 @@ sonos_mcp/
 │       │   ├── SKILL.md        # Main skill with workflows and tools
 │       │   └── references/     # Additional reference materials
 │       │       └── search_tips.md
-│       └── sonos-direct-code/  # Direct mode: Dispatcher tool interface
-│           ├── SKILL.md        # Tool documentation and workflows (includes TUI guide)
-│           └── sonos_tool.py   # CLI dispatcher (22 active tools: 19 Sonos + 3 TUI lifecycle)
+│       ├── sonos-direct-code/  # Direct mode: Dispatcher tool interface
+│       │   ├── SKILL.md        # Tool documentation and workflows (includes TUI guide)
+│       │   └── sonos_tool.py   # CLI dispatcher (22 active tools: 19 Sonos + 3 TUI lifecycle)
+│       └── tmux-tool/          # Direct mode: tmux CLI dispatcher for TUI interaction
+│           ├── SKILL.md        # tmux tool documentation and TUI workflows
+│           └── tmux_tool.py    # CLI dispatcher (6 tools: session mgmt + TUI interaction)
 │
 ├── sonos/                      # Core Sonos control library
 │   ├── __init__.py
@@ -173,6 +180,23 @@ sonos_mcp/
   - Standardized error handling and output formatting
   - 1-indexed positions for user-friendly CLI experience
   - State file coordination for TUI lifecycle management (~/.sonos/tui_state.json)
+
+**tmux Tool Skill** (`.claude/skills/tmux-tool/`) - Used in **Direct mode**:
+- **`SKILL.md`**: Comprehensive tmux dispatcher tool documentation
+  - YAML frontmatter: name and description for auto-discovery
+  - Tool descriptions: 6 CLI tools with parameters and usage examples
+  - Session management: find_session, create_session, get_pane, session_ready
+  - TUI interaction: capture_pane, send_keys
+  - Complete workflows: TUI interaction patterns, Sonos TUI integration
+  - Best practices: Pane ID management, error handling, text escaping
+  - Troubleshooting guide and technical details
+- **`tmux_tool.py`**: Command-line dispatcher (315 lines)
+  - 6 tools optimized for TUI interaction
+  - Automatic session creation via get_pane and session_ready
+  - Proper tmux command escaping (single quotes in text)
+  - Timeout protection (5 seconds per command)
+  - Adapted from tmux-mcp server (github.com/nickgnd/tmux-mcp)
+  - **Token efficiency**: ~200-500 tokens vs ~2,000 for tmux MCP server
 
 **Why Skills Over System Prompt:**
 - **Modularity**: Update skill independently of agent code
@@ -305,18 +329,20 @@ sonos_mcp/
 **Key Components:**
 - **`sdk_agent.py`**: Main agent application
   - `SonosSDKAgent` class manages agent lifecycle
-  - **MCP mode**: Connects to external MCP server via stdio
-  - **Direct mode**: Uses Bash tool to call dispatcher (sonos_tool.py)
+  - **MCP mode**: Connects to external Sonos MCP server via stdio
+  - **Direct mode**: Uses Bash tool to call CLI dispatchers (sonos_tool.py + tmux_tool.py)
+  - **No MCP servers in direct mode** (removed tmux MCP for token efficiency)
   - Handles conversation flow and tool execution
   - Session management and logging
   - No hardcoded skill references (skills auto-discovered)
 
 - **`system_prompt.py`**: Lightweight agent personality
   - **`SONOS_SYSTEM_PROMPT`**: MCP mode prompt (references sonos-control skill)
-  - **`SONOS_DIRECT_MODE_PROMPT`**: Direct mode prompt (references sonos-direct-code skill)
+  - **`SONOS_DIRECT_MODE_PROMPT`**: Direct mode prompt (references sonos-direct-code + tmux-tool skills)
   - Agent role and behavioral guidelines
   - Core principles (proactive, knowledgeable, conversational)
   - Mode-specific execution instructions
+  - TUI-based search workflow guidance
   - **Does NOT contain** tool/function descriptions (moved to skills)
 
 ### 5. Interactive TUI (`sonos_interactive_tui.py`)
@@ -324,10 +350,10 @@ sonos_mcp/
 **Purpose**: Experimental interactive terminal UI for search-and-play workflows using tmux.
 
 **Key Innovation**: Demonstrates how AI agents can interact with TUI applications through tmux by:
-- Launching a persistent TUI process
-- Capturing display state with `mcp__tmux__capture-pane`
+- Launching a persistent TUI process (via tui_start from sonos_tool.py)
+- Capturing display state with `tmux_tool.py capture_pane`
 - Analyzing visible output
-- Sending keystrokes with `mcp__tmux__execute-command`
+- Sending keystrokes with `tmux_tool.py send_keys`
 - Repeating the interaction cycle
 
 **Workflow:**
@@ -357,14 +383,15 @@ sonos_mcp/
 
 **Requirements:**
 - **tmux session named `"sonos"`** (create if doesn't exist)
-- tmux MCP server tools (`mcp__tmux__*`)
+- tmux_tool.py dispatcher for session management and TUI interaction
 - Same dependencies as CLI dispatcher (`sonos_actions`, etc.)
 
 **tmux Session Convention:**
 - Always use session name: `"sonos"`
-- Agent should check if session exists with `mcp__tmux__find-session(name="sonos")`
-- If not found, create with `mcp__tmux__create-session(name="sonos")`
-- Get pane ID from session using `mcp__tmux__list-windows` and `mcp__tmux__list-panes`
+- Agent should check if session exists with `tmux_tool.py find_session sonos`
+- If not found, create with `tmux_tool.py create_session sonos`
+- Get pane ID from session using `tmux_tool.py get_pane sonos`
+- Or use `tmux_tool.py session_ready sonos` for all-in-one setup
 
 **TUI Lifecycle Management:**
 
@@ -474,11 +501,11 @@ The agent supports two execution modes via the `--mode` flag:
 python3 sdk_agent.py              # No flag needed
 python3 sdk_agent.py --mode direct  # Explicit
 ```
-- Uses Bash tool to call CLI dispatcher (sonos_tool.py)
-- 21 discrete tools matching MCP functionality
-- Calls `sonos_actions` functions via dispatcher
-- ~15% token savings vs MCP mode
-- Ideal for: Local development, complex workflows, batch operations
+- Uses Bash tool to call CLI dispatchers (sonos_tool.py + tmux_tool.py)
+- 22 Sonos tools + 6 tmux tools matching MCP functionality
+- Calls `sonos_actions` functions and tmux commands via dispatchers
+- ~15% token savings vs MCP mode (~29k tokens: no MCP overhead + lightweight skills)
+- Ideal for: Local development, complex workflows, batch operations, TUI interaction
 
 **MCP Mode** - Portable, standardized:
 ```bash

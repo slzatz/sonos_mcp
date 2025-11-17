@@ -20,9 +20,9 @@ This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py <tool_name> [args...]
 ```
 
-**2. Interactive TUI** (ONLY when building queues with multiple searches):
+**2. Interactive TUI** (ONLY used to search for tracks or albums and place them on the queue and OPTIONALLY to play the track immediately):
 
-**IMPORTANT: This is the ONLY use case for tmux MCP tools!**
+**IMPORTANT: This is the ONLY use case for tmux tools (via tmux_tool.py dispatcher)!**
 
 ```bash
 # Launch in tmux session (ONLY for interactive TUI)
@@ -34,11 +34,12 @@ This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py
 **Use CLI Dispatcher (with Bash tool - NO tmux):**
 - ✅ Single operations (list_queue, clear_queue, play_from_queeu, volume, etc.)
 - ✅ Do not use for searches because searches require multiple steps: 1) searching for a track or album; 2) placing the track or album on the queue(where it is appended to the end) and 3) optionally playing from the position of the added track or album on the queue.
-- ❌ NEVER use `mcp__tmux__execute-command` to run CLI dispatcher tools
+- ❌ NEVER use tmux tools to run CLI dispatcher commands
 
-**Use Interactive TUI (with tmux MCP tools):**
+**Use Interactive TUI (with tmux_tool.py for interaction):**
 - ✅ for all search-related actions since they are always multi-step
 - ❌ NOT for non-search operations (volume, current track, etc.)
+- See tmux-tool skill for tmux interaction tools
 
 ### CLI Dispatcher Examples
 
@@ -98,7 +99,7 @@ Returns JSON with:
 **Recommended Workflow:**
 1. Always call `tui_status` first to check if TUI is already running
 2. If not running, call `tui_start` to launch it
-3. Use the returned pane ID with tmux MCP tools for interaction
+3. Use tmux_tool.py for TUI interaction (capture/send keys)
 4. When done, optionally call `tui_stop` to clean up
 
 **Example:**
@@ -111,9 +112,9 @@ Returns JSON with:
 /home/slzatz/sonos_mcp/.venv/bin/python3 .../sonos_tool.py tui_start
 # Returns: "TUI started successfully on pane %0"
 
-# Step 3: Interact via tmux MCP tools (see below)
-mcp__tmux__capture-pane(paneId="%0", lines=40)
-mcp__tmux__execute-command(paneId="%0", command="search query", rawMode=true)
+# Step 3: Interact via tmux_tool.py (see tmux-tool skill)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "search query"
 
 # Step 4: Stop when done
 /home/slzatz/sonos_mcp/.venv/bin/python3 .../sonos_tool.py tui_stop
@@ -121,7 +122,7 @@ mcp__tmux__execute-command(paneId="%0", command="search query", rawMode=true)
 
 ## Interactive TUI Approach (Experimental)
 
-**IMPORTANT: tmux MCP tools are ONLY for this Interactive TUI - NOT for CLI dispatcher commands!**
+**IMPORTANT: tmux tools (via tmux_tool.py) are ONLY for TUI interaction - NOT for CLI dispatcher commands!**
 
 **When to use this:**
 - ALL search operations (track or album searches)
@@ -150,43 +151,33 @@ The `sonos_interactive_tui.py` script (located in project root) provides a runni
 
 **IMPORTANT: Session Convention**
 - Always use session name: `"sonos"`
-- Create the session if it doesn't exist
+- Create the session if it doesn't exist (use tui_start or tmux_tool.py)
 - Use the first available pane from the session
 
-**Step 0: Ensure tmux session exists**
+**Step 0: Ensure tmux session exists and get pane ID**
 
-Before launching the TUI, you MUST ensure a tmux session named "sonos" exists:
+Use tmux_tool.py (see tmux-tool skill for details) or tui_start from sonos_tool.py:
 
-```python
-# Check if "sonos" session exists
-mcp__tmux__find-session(name="sonos")
+```bash
+# Option 1: Use tui_start (recommended - handles everything)
+python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_start
+# Returns: "TUI started successfully on pane %0"
 
-# If it doesn't exist (returns error/not found), create it:
-mcp__tmux__create-session(name="sonos")
-
-# Get the session ID (usually "$0")
-# List windows in the session
-mcp__tmux__list-windows(sessionId="$0")
-
-# Get panes from the first window (usually "@0")
-mcp__tmux__list-panes(windowId="@0")
-
-# This gives you a pane ID (e.g., "%0") to use for the TUI
+# Option 2: Manual session setup with tmux_tool.py
+python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos
+# Returns: "Session 'sonos' created. Pane ready: %0"
 ```
 
-**Step 1: Launch TUI in tmux pane**
-```python
-# Launch the TUI in the pane you identified in Step 0
-mcp__tmux__execute-command(
-  paneId="%0",  # Use the pane ID from Step 0
-  command="cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py",
-  rawMode=true
-)
+**Step 1: Launch TUI (if using manual approach)**
+```bash
+# If not using tui_start, launch TUI manually
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 \
+  "cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py"
 ```
 
 **Step 2: Capture initial state**
 ```bash
-mcp__tmux__capture-pane(paneId="%0", lines=40)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
 ```
 
 You'll see:
@@ -204,16 +195,12 @@ Search:
 
 **Step 3: Send search query**
 ```bash
-mcp__tmux__execute-command(
-  paneId="%0",
-  command="Heart of Gold Neil Young",
-  rawMode=true
-)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Heart of Gold Neil Young"
 ```
 
 **Step 4: Capture search results**
 ```bash
-mcp__tmux__capture-pane(paneId="%0", lines=60)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 60
 ```
 
 You'll see numbered results:
@@ -234,16 +221,12 @@ Select track (1-50) or 'q' to search again:
 Examine the results and pick the best match. Send the track number:
 
 ```bash
-mcp__tmux__execute-command(
-  paneId="%0",
-  command="1",
-  rawMode=true
-)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
 ```
 
 **Step 6: Capture queue confirmation**
 ```bash
-mcp__tmux__capture-pane(paneId="%0", lines=20)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 20
 ```
 
 You'll see:
@@ -257,10 +240,10 @@ Play now? (y/n):
 
 ```bash
 # To play now:
-mcp__tmux__execute-command(paneId="%0", command="y", rawMode=true)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
 
 # Or just queue it:
-mcp__tmux__execute-command(paneId="%0", command="n", rawMode=true)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
 ```
 
 **Step 8: Loop continues**
@@ -276,7 +259,7 @@ Search:
 
 You can now search for another track, or quit:
 ```bash
-mcp__tmux__execute-command(paneId="%0", command="quit", rawMode=true)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "quit"
 ```
 
 ### TUI State Management
@@ -300,10 +283,9 @@ While in the TUI, you can send:
 |---------|----------------|----------------|
 | **Process lifecycle** | Runs continuously | Tool invoked per operation |
 | **State** | Maintains state | Stateless (reads from files) |
-| **Search workflow** | Integrated (search → select → play) | Manual steps (separate tool calls) |
-| **Best for** | Multiple searches, queue building | Single operations, specific tasks |
-| **Token efficiency** | High (fewer tool calls) | Moderate (each operation = tool call) |
-| **Requires tmux** | Yes | No |
+| **Search workflow** | Integrated (search → select → play) | No search capability |
+| **Used for** | Searches, queue building | ALL other tasks |
+| **Uses tmux** | Yes | No |
 | **Control flow** | Sequential prompts | Explicit tool selection |
 
 ### TUI Implementation Details
@@ -312,15 +294,15 @@ While in the TUI, you can send:
 
 **tmux Requirements:**
 - **Session name convention**: `"sonos"` (always use this name)
-- **Automatic creation**: Create the session if it doesn't exist with `mcp__tmux__create-session`
-- **Session check**: Always verify session exists with `mcp__tmux__find-session` before use
-- **Pane ID**: Get from `mcp__tmux__list-panes` (typically `"%0"` for first pane)
+- **Automatic creation**: Use `tui_start` or `tmux_tool.py session_ready` to setup session
+- **Session check**: Use `tmux_tool.py find_session` to verify session exists
+- **Pane ID**: Get from `tmux_tool.py get_pane` (typically `"%0"` for first pane)
 
 **Dependencies:**
 - Uses `sonos_actions` library for all Sonos operations
 - Saves search results to same JSON files as CLI tools
 - Compatible with existing search result caching
-- Requires tmux MCP server tools (`mcp__tmux__*`)
+- Requires tmux tools (via tmux_tool.py dispatcher from tmux-tool skill)
 
 **Features:**
 - Clear prompts designed for tmux capture
@@ -333,16 +315,14 @@ While in the TUI, you can send:
 Here's a complete example of using the TUI to build a queue of multiple tracks:
 
 ```python
-# Step 0: Ensure "sonos" tmux session exists
-mcp__tmux__find-session(name="sonos")  # Check if exists
-# If not found, create it:
-mcp__tmux__create-session(name="sonos")
-# Get pane ID from session
-mcp__tmux__list-windows(sessionId="$0")
-mcp__tmux__list-panes(windowId="@0")  # Get pane ID like "%0"
+# Step 0: Ensure "sonos" tmux session exists and launch TUI
+# Use tui_start (recommended - handles everything):
+python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_start
+# Returns: "TUI started successfully on pane %0"
 
-# Step 1: Launch TUI in the sonos session pane
-mcp__tmux__execute-command(paneId="%0", command="cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py", rawMode=true)
+# OR manual approach with tmux_tool.py:
+python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos  # Get pane ID
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py"
 
 # Search for first artist
 execute_command(paneId="%0", command="Neil Young Heart of Gold", rawMode=true)
@@ -368,103 +348,6 @@ execute_command(paneId="%0", command="quit", rawMode=true)
 
 This builds a 3-track queue and starts playback - all within one continuous TUI session.
 
-## Critical Workflow Rules
-
-### MANDATORY Two-Step Workflow for Search Operations
-
-**YOU MUST ALWAYS use a two-step approach when searching for and adding music:**
-
-**CRITICAL: "Two-Step" means TWO SEPARATE TOOL CALLS, not two tools in one command!**
-
-**Why This Is Mandatory:**
-- Search results are unpredictable and context-dependent
-- The best match is **NOT always position 1**
-- Artist name variations (Bill Callahan vs. Smog, for example)
-- Multiple versions exist (remaster, live, cover, original, etc.)
-- You MUST examine results before selecting which position to add
-
-**The Two-Step Pattern (TWO SEPARATE TOOL CALLS):**
-
-**Step 1: FIRST TOOL CALL - Search ONLY**
-```bash
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "Bill Callahan The Breeze"
-```
-
-**STOP HERE! Examine the output. DO NOT add anything yet.**
-
-**Then:** Read the search results, identify which position is the best match, communicate your selection to the user.
-
-**Step 2: SECOND TOOL CALL - Add ONLY**
-```bash
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_track_to_queue 3
-```
-
-**Key Point:** These are TWO SEPARATE Bash tool calls. After the first one completes, you see the results, analyze them, then make the second call.
-
-**Example - Correct Workflow for "Play a Track":**
-
-User asks: "Play Bill Callahan's version of The Breeze"
-
-**Step 1: Search**
-```bash
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "Bill Callahan The Breeze"
-```
-
-**Step 2: Examine Results & Select**
-Agent analyzes output: "Position 3 is specifically by Bill Callahan, that's the one!"
-
-**Step 3: Add to Queue**
-```bash
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_track_to_queue 3
-```
-
-**IMPORTANT: `add_track_to_queue` ONLY adds the track - it does NOT start playing!**
-
-**Step 4: List Queue to Find Position**
-```bash
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py list_queue
-```
-
-**Step 5: Play from That Position** (REQUIRED - adding doesn't auto-play!)
-```bash
-# If queue shows 5 tracks total, the newly added track is at position 5
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py play_from_queue 5
-```
-
-**NOTE:** There is NO `--play` flag or option on `add_track_to_queue`. You MUST call `play_from_queue` as a separate tool to start playback.
-
-**CRITICAL: When you add a track to the queue, it goes to the END of the queue!**
-- After adding a track, use `list_queue` to count how many tracks are in the queue
-- The newly added track is at the LAST position (highest number)
-- `play_from_queue` uses 1-based indexing (position 1 = first track, position N = last track)
-- Position must be a positive integer from 1 to the queue length (no negative numbers!)
-
-**Notice:** Multiple separate tool calls with analysis happening between them.
-
-**NEVER Do This (Anti-Pattern):**
-```bash
-# ❌ WRONG - DO NOT DO THIS - trying to chain operations with && or ;
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "The Breeze" && /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_track_to_queue 1
-```
-
-**Why the anti-pattern is wrong:**
-- You haven't examined what position 1 actually is
-- Position 1 might be a cover, live version, or wrong artist
-- You're guessing instead of selecting based on actual results
-- This defeats the purpose of having search results
-
-**This applies to:**
-- `search_for_track()` → `add_track_to_queue()`
-- `search_for_album()` → `add_album_to_queue()`
-- Any workflow where you search first then add
-
-**Exception:**
-The two-step pattern is not required for operations that don't involve searching:
-- `list_queue()` - just displays queue
-- `current_track_info()` - just shows current track
-- `list_playlists()` - just lists playlists
-- `add_playlist_to_queue()` - you already know the playlist name
-
 ## When to Use Direct Mode
 
 **Use this approach when:**
@@ -474,6 +357,7 @@ The two-step pattern is not required for operations that don't involve searching
 - Building conversational workflows
 
 **Use MCP mode instead when:**
+- Running in mcp mode
 - Need portability across AI platforms
 - Working in Claude Desktop or other MCP clients
 - Want standard protocol compliance
@@ -501,27 +385,9 @@ Change the master speaker to a different Sonos device.
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py set_master_speaker "Bedroom"
 ```
 
-### Music Search (2 tools)
+### Music Search ()
 
-#### `search_for_track <query>`
-Search for music tracks by title, artist, or both.
-
-**Usage:**
-```bash
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "Heart of Gold Neil Young"
-```
-
-**Returns:** Numbered list of matching tracks
-
-#### `search_for_album <query>`
-Search for music albums by title or artist.
-
-**Usage:**
-```bash
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_album "Harvest"
-```
-
-**Returns:** Numbered list of matching albums
+#### Use previously described TUI for all search operations
 
 ### Queue Management (6 tools)
 
@@ -785,24 +651,133 @@ These workflows demonstrate how to combine multiple tools for common tasks. Reme
 
 ### Search and Play a Track
 
-**CRITICAL: To actually PLAY music, you need BOTH `add_track_to_queue` AND `play_from_queue`!**
-Adding alone just queues the track - it doesn't start playback.
+**IMPORTANT: uses tmux and sonos_interactive_tui.py
+
+Session Convention**
+- Always use session name: `"sonos"`
+- Create the session if it doesn't exist
+- Use the first available pane from the session
+
+**Step 0: Ensure tmux session exists**
+
+Before launching the TUI, you MUST ensure a tmux session named "sonos" exists:
+
+```python
+# Check if "sonos" session exists
+python3 .claude/skills/tmux-tool/tmux_tool.py find_session sonos
+
+# If it doesn't exist (returns error/not found), create it:
+python3 .claude/skills/tmux-tool/tmux_tool.py create_session sonos
+
+# Get the session ID (usually "$0")
+# List windows in the session
+# Use get_pane instead of separate window/pane listing
+
+# Get panes from the first window (usually "@0")
+python3 .claude/skills/tmux-tool/tmux_tool.py get_pane sonos
+
+# This gives you a pane ID (e.g., "%0") to use for the TUI
+```
+
+**Step 1: Launch TUI in tmux pane**
+```python
+# Launch the TUI in the pane you identified in Step 0
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0
+  paneId="%0",  # Use the pane ID from Step 0
+  command="cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py",
+  rawMode=true
+)
+```
+
+**Step 2: Capture initial state**
+```bash
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+```
+
+You'll see:
+```
+================================================================================
+Sonos Interactive Track Search
+================================================================================
+Commands: Type search query, track number, or 'quit' to exit
+
+Initializing Sonos speaker...
+Connected to: Office2
+
+Search:
+```
+
+**Step 3: Send search query**
+```bash
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Heart of Gold Neil Young"
+```
+
+**Step 4: Capture search results**
+```bash
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 60
+```
+
+You'll see numbered results:
+```
+Found 50 results:
+--------------------------------------------------------------------------------
+1. Heart of Gold - Neil Young - Harvest
+2. Heart of Gold - Old Man With A Heart... - Neil Young We Miss Streaming You
+3. Heart of Gold (Cover) - ...
+...
+--------------------------------------------------------------------------------
+
+Select ithe track (1-50) that best matches the request from the user or 'q' to search again:
+```
+
+**Step 5: Analyze results and send selection**
+
+Examine the results and pick the best match. Send the track number:
 
 ```bash
-# Step 1: Search
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "Heart of Gold Neil Young"
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0
+  paneId="%0",
+  command="3",
+  rawMode=true
+)
+```
 
-# Step 2: Examine results, select position (let's say it's position 2)
+**Step 6: Capture queue confirmation**
+```bash
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 20
+```
 
-# Step 3: Add to queue (does NOT start playing!)
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_track_to_queue 2
+You'll see:
+```
+Adding track 3 to queue...
+Track added at position 12.
+Play now? (y/n):
+```
 
-# Step 4: Check queue to find where it was added
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py list_queue
+**Step 7: Choose whether to play immediately**
 
-# Step 5: Play from that position (REQUIRED to start playback!)
-# If queue shows 5 tracks, the newly added track is at position 5
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py play_from_queue 5
+```bash
+# To play now:
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
+
+# Or just queue it:
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
+```
+
+**Step 8: Loop continues**
+
+After your choice, the TUI returns to the search prompt:
+```
+Now playing track 12!
+
+================================================================================
+
+Search:
+```
+
+You can now search for another track, or quit:
+```bash
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "quit"
 ```
 
 ### Load and Play a Playlist
@@ -822,17 +797,26 @@ Adding alone just queues the track - it doesn't start playback.
 
 ```bash
 # Search for first artist
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "Neil Young"
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0paneId='%0', command='Joan Baez', rawMode=True)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 50
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0paneId='%0', command='1', rawMode=True)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 20
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0paneId='%0', command='n', rawMode=True)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 20
 
-# Add favorite track to playlist (position 3)
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_to_playlist_from_search my_mix 3
+# Add track to playlist (position 3)
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_to_playlist_from_queue my_mix 3
 
 # Search for second artist
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py search_for_track "Bob Dylan"
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0paneId='%0', command='Bob Dylan', rawMode=True)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 50
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0paneId='%0', command='1', rawMode=True)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 20
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0paneId='%0', command='n', rawMode=True)
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 20
 
-# Add another track
-/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_to_playlist_from_search my_mix 1
-
+# Add track to playlist (position 4)
+/home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py add_to_playlist_from_queue my_mix 4
 # View the playlist
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py list_playlist_tracks my_mix
 ```
