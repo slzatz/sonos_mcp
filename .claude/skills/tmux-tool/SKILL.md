@@ -124,9 +124,16 @@ python3 .claude/skills/tmux-tool/tmux_tool.py send_keys <pane_id> <text> [enter]
 ```
 
 **Parameters:**
-- `pane_id` (required): Pane ID like "%0"
+- `pane_id` (required): Pane ID like "%0" - **MUST be the pane ID, NOT session name!**
 - `text` (required): Text to send (single quotes are auto-escaped)
 - `enter` (optional): Press Enter after text (default: "true", set "false" to skip)
+
+**CRITICAL - Common Mistake:**
+- ✅ CORRECT: `send_keys %0 "search query"`
+- ❌ WRONG: `send_keys sonos 0 "search query"` (splits pane ID incorrectly!)
+- ❌ WRONG: `send_keys sonos "search query"` (uses session name instead of pane ID!)
+
+Always use the pane ID returned from `get_pane` or `session_ready` (e.g., "%0"), not the session name!
 
 **Returns:**
 - Success confirmation
@@ -214,22 +221,33 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
 - Session named "sonos" exists
 - Pane ID available (usually %0)
 
-**Typical interaction cycle:**
+**Search Type Control:**
+- **Track search (default):** Send query without prefix (e.g., `Heart of Gold Neil Young`)
+- **Album search:** Send query with `album:` prefix (e.g., `album: Harvest Neil Young`)
+  - **IMPORTANT:** Prefer `album:` with colon, but `album ` with space also works
+  - Examples: `album: Nebraska` (preferred) or `album Nebraska` (also works)
+
+**Typical interaction cycle for track search:**
 
 ```bash
-# 1. Check TUI status
+# 1. Get pane ID (CRITICAL: Save this for all subsequent commands!)
+PANE_ID=$(python3 .claude/skills/tmux-tool/tmux_tool.py get_pane sonos)
+# Returns: %0
+
+# 2. Check TUI status (optional)
 python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_status
 # Returns: running, pane_id: %0, current_prompt: search
 
-# 2. Capture TUI display
+# 3. Capture TUI display (use PANE_ID, NOT "sonos"!)
 python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
 # See search prompt
 
-# 3. Send search query
+# 4. Send search query (track search - default)
+# CRITICAL: Use %0 (pane ID), NOT "sonos 0" or "sonos"!
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Heart of Gold Neil Young"
 
 # 4. Capture search results
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 60
 # See numbered track list
 
 # 5. Select track
@@ -239,6 +257,28 @@ python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
 
 # 7. Back to search prompt (repeat as needed)
+```
+
+**Typical interaction cycle for album search:**
+
+```bash
+# 1-2. Same as above (check status, capture display)
+
+# 3. Send album search query (note the "album:" prefix)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "album: Harvest Neil Young"
+
+# 4. Capture album search results
+python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 60
+# See numbered album list
+
+# 5. Select album
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
+# Adds all album tracks to queue
+
+# 6. Confirm add/play
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
+
+# 7. Back to search prompt (can mix track/album searches)
 ```
 
 ---

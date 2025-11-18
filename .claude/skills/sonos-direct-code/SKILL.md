@@ -136,10 +136,19 @@ python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "search query"
 ### Overview
 
 The `sonos_interactive_tui.py` script (located in project root) provides a running interactive interface that allows you to:
-1. Search for tracks
+1. Search for tracks or albums
 2. See results and select the best match
 3. Add to queue with the option of immediate playback
 4. Loop back for more searches - all within a single running process
+
+**Search Type Control:**
+- **Track search (default):** Just enter your query (e.g., `Heart of Gold Neil Young`)
+- **Album search:** Prefix query with `album:` (e.g., `album: Harvest Neil Young`)
+  - **IMPORTANT:** Use `album:` with colon (preferred) or `album ` with space
+  - Both formats work, but colon is preferred for clarity
+  - Example: `album: Nebraska Bruce Springsteen` or `album Nebraska Bruce Springsteen`
+
+The TUI automatically detects the prefix and uses the appropriate search and add functions.
 
 **This leverages tmux's ability to:**
 - Launch and keep a TUI running
@@ -183,9 +192,9 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
 You'll see:
 ```
 ================================================================================
-Sonos Interactive Track Search
+Sonos Interactive Track and Album Search
 ================================================================================
-Commands: Type search query, track number, or 'quit' to exit
+Commands: Type search query, track/album number, or 'quit' to exit
 
 Initializing Sonos speaker...
 Connected to: Office2
@@ -194,8 +203,15 @@ Search:
 ```
 
 **Step 3: Send search query**
+
+For track search (default):
 ```bash
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Heart of Gold Neil Young"
+```
+
+For album search (use `album:` prefix):
+```bash
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "album: Harvest Neil Young"
 ```
 
 **Step 4: Capture search results**
@@ -218,7 +234,7 @@ Select track (1-50) or 'q' to search again:
 
 **Step 5: Analyze results and send selection**
 
-Examine the results and pick the best match. Send the track number:
+Examine the results and pick the best match. Send the item number (track or album):
 
 ```bash
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
@@ -273,8 +289,11 @@ The TUI maintains state across operations:
 
 While in the TUI, you can send:
 - **Search query** (any text at "Search:" prompt)
-- **Track number** (1-N at "Select track:" prompt)
-- **"q"** or **"quit"** (to exit TUI)
+  - For track search: `Heart of Gold Neil Young` (default)
+  - For album search: `album: Harvest Neil Young` (preferred) or `album Harvest Neil Young`
+  - **TIP:** Use colon for clarity, but space also works
+- **Track/Album number** (1-N at "Select track:" prompt)
+- **"q"** or **"quit"** (to exit TUI or return to search)
 - **"y"** or **"n"** (at "Play now?" prompt)
 
 ### TUI vs CLI Dispatcher Comparison
@@ -324,19 +343,19 @@ python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_start
 python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos  # Get pane ID
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py"
 
-# Search for first artist
+# Search for first track
 execute_command(paneId="%0", command="Neil Young Heart of Gold", rawMode=true)
 capture_pane(paneId="%0")  # See results
 execute_command(paneId="%0", command="1", rawMode=true)  # Select track 1
 execute_command(paneId="%0", command="n", rawMode=true)  # Queue, don't play yet
 
-# Search for second artist
-execute_command(paneId="%0", command="Bob Dylan Tangled Up in Blue", rawMode=true)
-capture_pane(paneId="%0")  # See results
-execute_command(paneId="%0", command="2", rawMode=true)  # Select track 2
-execute_command(paneId="%0", command="n", rawMode=true)  # Queue, don't play yet
+# Search for an album (note the "album:" prefix)
+execute_command(paneId="%0", command="album: Harvest Neil Young", rawMode=true)
+capture_pane(paneId="%0")  # See album results
+execute_command(paneId="%0", command="1", rawMode=true)  # Select album 1
+execute_command(paneId="%0", command="n", rawMode=true)  # Queue all tracks, don't play yet
 
-# Search for third artist
+# Search for third track
 execute_command(paneId="%0", command="Leonard Cohen Suzanne", rawMode=true)
 capture_pane(paneId="%0")  # See results
 execute_command(paneId="%0", command="1", rawMode=true)  # Select track 1
@@ -346,7 +365,7 @@ execute_command(paneId="%0", command="y", rawMode=true)  # Queue and start playi
 execute_command(paneId="%0", command="quit", rawMode=true)
 ```
 
-This builds a 3-track queue and starts playback - all within one continuous TUI session.
+This builds a queue with tracks and a full album, then starts playback - all within one continuous TUI session. The example demonstrates mixing track searches with album searches using the `album:` prefix.
 
 ## When to Use Direct Mode
 
@@ -363,9 +382,11 @@ This builds a 3-track queue and starts playback - all within one continuous TUI 
 - Want standard protocol compliance
 - Multi-client scenarios
 
-## Available Tools (24 Total)
+## Available Tools (22 Total)
 
 The dispatcher provides these tools. Most tools automatically initialize the speaker connection (TUI lifecycle tools do not require speaker connection).
+
+**IMPORTANT:** There are NO CLI search tools - ALL searches must use the Interactive TUI!
 
 ### Speaker Management (2 tools)
 
@@ -385,9 +406,15 @@ Change the master speaker to a different Sonos device.
 /home/slzatz/sonos_mcp/.venv/bin/python3 /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py set_master_speaker "Bedroom"
 ```
 
-### Music Search ()
+### Music Search (0 CLI tools)
 
-#### Use previously described TUI for all search operations
+**CRITICAL: There are NO CLI search tools available!**
+
+- ❌ `search_for_track` - NOT AVAILABLE as CLI tool
+- ❌ `search_for_album` - NOT AVAILABLE as CLI tool
+- ✅ **Use the Interactive TUI for ALL search operations** (tracks and albums)
+
+All music searches (both tracks and albums) MUST use the Interactive TUI workflow described above. The CLI dispatcher does NOT provide search tools.
 
 ### Queue Management (6 tools)
 
@@ -649,7 +676,7 @@ TUI not running
 
 These workflows demonstrate how to combine multiple tools for common tasks. Remember: The dispatcher path is long, so store it in a variable in your workflow for readability (if combining multiple calls).
 
-### Search and Play a Track
+### Search and Play Music (Tracks or Albums)
 
 **IMPORTANT: uses tmux and sonos_interactive_tui.py
 
@@ -697,9 +724,9 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
 You'll see:
 ```
 ================================================================================
-Sonos Interactive Track Search
+Sonos Interactive Track and Album Search
 ================================================================================
-Commands: Type search query, track number, or 'quit' to exit
+Commands: Type search query, track/album number, or 'quit' to exit
 
 Initializing Sonos speaker...
 Connected to: Office2
@@ -708,8 +735,15 @@ Search:
 ```
 
 **Step 3: Send search query**
+
+For track search (default):
 ```bash
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Heart of Gold Neil Young"
+```
+
+For album search (use `album:` prefix):
+```bash
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "album: Harvest Neil Young"
 ```
 
 **Step 4: Capture search results**
@@ -727,12 +761,12 @@ Found 50 results:
 ...
 --------------------------------------------------------------------------------
 
-Select ithe track (1-50) that best matches the request from the user or 'q' to search again:
+Select the track or album (1-50) that best matches the request from the user or 'q' to search again:
 ```
 
 **Step 5: Analyze results and send selection**
 
-Examine the results and pick the best match. Send the track number:
+Examine the results and pick the best match. Send the item number (track or album):
 
 ```bash
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0

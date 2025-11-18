@@ -7,11 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A comprehensive Sonos speaker control system with natural language interface using Claude AI. The project provides both programmatic Python APIs and an AI-powered conversational agent for controlling Sonos speakers through the Model Context Protocol (MCP).
 
 **Key Features:**
-- Natural language control: "Play Heart of Gold by Neil Young", "Turn it up", "Show my playlists"
+- Natural language control: "Play Heart of Gold by Neil Young", "Play the album Nebraska", "Turn it up", "Show my playlists"
 - **Dual execution modes**: MCP server (portable) or direct Python (efficient)
-- **Interactive TUI mode**: Experimental tmux-based interface for stateful search workflows
+- **Interactive TUI mode**: Experimental tmux-based interface for stateful track and album search workflows
 - **Agent Skills architecture** with progressive disclosure for efficient context usage
-- Music search across Amazon Music
+- Music search across Amazon Music (tracks and albums)
+- Intelligent album playback (starts from first track, not last)
 - Queue and playlist management
 - Volume control (adjust, set level, mute/unmute)
 - Multi-speaker support with dynamic speaker switching
@@ -347,7 +348,7 @@ sonos_mcp/
 
 ### 5. Interactive TUI (`sonos_interactive_tui.py`)
 
-**Purpose**: Experimental interactive terminal UI for search-and-play workflows using tmux.
+**Purpose**: Experimental interactive terminal UI for track and album search-and-play workflows using tmux.
 
 **Key Innovation**: Demonstrates how AI agents can interact with TUI applications through tmux by:
 - Launching a persistent TUI process (via tui_start from sonos_tool.py)
@@ -356,11 +357,21 @@ sonos_mcp/
 - Sending keystrokes with `tmux_tool.py send_keys`
 - Repeating the interaction cycle
 
+**Search Type Support:**
+- **Track search (default)**: Send query without prefix (e.g., `Heart of Gold Neil Young`)
+- **Album search**: Send query with `album:` or `album ` prefix (e.g., `album: Nebraska Bruce Springsteen`)
+  - Both `album:` (with colon) and `album ` (with space) are supported
+  - Colon format is preferred but space also works for robustness
+
 **Workflow:**
-1. **Search**: Agent sends search query → TUI displays numbered results
+1. **Search**: Agent sends search query (track or album) → TUI displays numbered results
 2. **Analyze**: Agent captures and examines results
-3. **Select**: Agent sends track number → TUI adds to queue
+3. **Select**: Agent sends item number → TUI adds to queue
+   - Tracks: Single track added at end of queue
+   - Albums: All album tracks added sequentially to queue
 4. **Play Decision**: Agent chooses to play immediately (y) or queue only (n)
+   - Tracks: Plays the single added track
+   - Albums: Plays from first track of album (intelligent position tracking)
 5. **Loop**: TUI returns to search prompt for next operation
 
 **Advantages over CLI Dispatcher:**
@@ -436,6 +447,27 @@ The state file is updated at key points:
 **File Locations:**
 - TUI Script: `/home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_interactive_tui.py`
 - State File: `~/.sonos/tui_state.json` (tracks running status and current prompt)
+- Search Results:
+  - Track searches: `~/.sonos/search_results/track_search.json`
+  - Album searches: `~/.sonos/search_results/album_search.json`
+
+**Implementation Details:**
+
+The TUI intelligently handles both track and album searches with different behaviors:
+
+**Track Search:**
+- Saves results as dictionaries: `{"title": "...", "artist": "...", "album": "...", "item_id": "...", "uri": "..."}`
+- Adds single track to queue
+- Returns queue position of added track for playback
+
+**Album Search:**
+- Saves results as dictionaries: `{"title": "Album Name", "artist": "...", "album": "Album Name", "item_id": "...", "uri": "..."}`
+- Adds all album tracks to queue sequentially
+- Tracks queue position BEFORE adding to determine first track position
+- Returns first track position (not last) for correct album playback
+- Example: Album with 10 tracks added to queue at positions 15-24 → returns position 15 for playback
+
+This design ensures that when an album is selected for immediate playback, it starts from the beginning of the album, not the last track.
 
 **Compatibility:**
 - Saves search results to same JSON files as CLI tools

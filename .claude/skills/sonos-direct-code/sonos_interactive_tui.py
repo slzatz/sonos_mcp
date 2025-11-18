@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Interactive Sonos TUI for Track Search and Playback
+Interactive Sonos TUI for Track and Album Search and Playback
 
 Experimental TUI designed to work with tmux for agent-driven interaction.
-Supports search → select → add to queue → optional immediate playback workflow.
+Supports search (tracks or albums) → select → add to queue → optional immediate playback workflow.
 """
 
 import sys
@@ -24,8 +24,9 @@ class SonosInteractiveTUI:
 
     def __init__(self):
         self.search_results = []
-        self.search_results_file = Path.home() / ".sonos" / "search_results" / "track_search.json"
-        self.search_results_file.parent.mkdir(parents=True, exist_ok=True)
+        self.search_type = "track"  # Default to track search, can be "track" or "album"
+        self.search_results_dir = Path.home() / ".sonos" / "search_results"
+        self.search_results_dir.mkdir(parents=True, exist_ok=True)
         self.state_file = Path.home() / ".sonos" / "tui_state.json"
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -92,14 +93,33 @@ class SonosInteractiveTUI:
             print("Empty query. Please try again.")
             return False
 
-        print(f"\nSearching for: {query}")
-        try:
-            # Call sonos_actions search function (saves results to track_search.json)
-            result_text = sonos_actions.search_for_track(query)
+        # Parse search type from query prefix
+        # Accept both "album:" and "album " for robustness
+        if query.lower().startswith("album:"):
+            self.search_type = "album"
+            actual_query = query[6:].strip()  # Remove "album:" prefix
+        elif query.lower().startswith("album "):
+            self.search_type = "album"
+            actual_query = query[6:].strip()  # Remove "album " prefix
+        else:
+            self.search_type = "track"
+            actual_query = query.strip()
 
-            # Load the results from the JSON file that search_for_track created
-            if self.search_results_file.exists():
-                with open(self.search_results_file) as f:
+        # Display what type of search we're performing
+        print(f"\nSearching for {self.search_type}: {actual_query}")
+
+        try:
+            # Call appropriate search function based on type
+            if self.search_type == "album":
+                result_text = sonos_actions.search_for_album(actual_query)
+                results_file = self.search_results_dir / "album_search.json"
+            else:
+                result_text = sonos_actions.search_for_track(actual_query)
+                results_file = self.search_results_dir / "track_search.json"
+
+            # Load the results from the JSON file that search function created
+            if results_file.exists():
+                with open(results_file) as f:
                     self.search_results = json.load(f)
 
                 if self.search_results:
@@ -117,44 +137,65 @@ class SonosInteractiveTUI:
             return False
 
     def handle_selection(self, selection_input):
-        """Process track selection."""
+        """Process track or album selection."""
         try:
             position = int(selection_input)
             if position < 1 or position > len(self.search_results):
                 print(f"Invalid selection. Please choose 1-{len(self.search_results)}")
                 return False
 
-            # Add to queue
-            print(f"\nAdding track {position} to queue...")
-            result = sonos_actions.add_track_to_queue(position)
+            # Get queue length BEFORE adding to determine start position
+            queue_before = sonos_actions.list_queue()
+            start_position = len(queue_before) + 1
+
+            # Add to queue using appropriate function based on search type
+            item_type = self.search_type
+            print(f"\nAdding {item_type} {position} to queue...")
+
+            if self.search_type == "album":
+                result = sonos_actions.add_album_to_queue(position)
+            else:
+                result = sonos_actions.add_track_to_queue(position)
+
             if result:
                 print(result)
 
-            # Get current queue length to know position of newly added track
-            queue = sonos_actions.list_queue()
-            queue_length = len(queue)
+            # Get current queue length to know position of newly added item(s)
+            queue_after = sonos_actions.list_queue()
+            end_position = len(queue_after)
 
-            print(f"Track added at position {queue_length}.")
-            return queue_length
+            if self.search_type == "album":
+                num_tracks = end_position - start_position + 1
+                print(f"Album tracks added to queue (positions {start_position}-{end_position}, {num_tracks} tracks).")
+                return start_position  # Play from first track of album
+            else:
+                print(f"Track added at position {end_position}.")
+                return end_position  # For single tracks, start = end
 
         except ValueError:
             print("Invalid input. Please enter a number.")
             return False
         except Exception as e:
-            print(f"Error adding track: {e}")
+            print(f"Error adding {self.search_type}: {e}")
             return False
 
     def handle_play_choice(self, choice, queue_position):
         """Handle immediate playback choice."""
         if choice.lower() in ['y', 'yes']:
             try:
-                print(f"\nPlaying track from position {queue_position}...")
+                if self.search_type == "album":
+                    print(f"\nPlaying album from position {queue_position}...")
+                else:
+                    print(f"\nPlaying track from position {queue_position}...")
                 # play_from_queue expects 0-indexed position
                 result = sonos_actions.play_from_queue(queue_position - 1)
                 if result:
                     print(result)
                 else:
-                    print(f"Now playing track {queue_position}!")
+                    if self.search_type == "album":
+                        print(f"Now playing album starting from track {queue_position}!")
+                    else:
+                        print(f"Now playing track {queue_position}!")
                 return True
             except Exception as e:
                 print(f"Error playing track: {e}")
@@ -166,9 +207,9 @@ class SonosInteractiveTUI:
     def main_loop(self):
         """Main interactive loop."""
         print("=" * 80)
-        print("Sonos Interactive Track Search")
+        print("Sonos Interactive Track and Album Search")
         print("=" * 80)
-        print("Commands: Type search query, track number, or 'quit' to exit\n")
+        print("Commands: Type search query, track/album number, or 'quit' to exit\n")
 
         if not self.initialize_speaker():
             return
@@ -193,8 +234,8 @@ class SonosInteractiveTUI:
                 # Update state after successful search
                 self.write_state(status="running", current_prompt="select")
 
-                # State 2: Get track selection
-                selection = input(f"\nSelect track (1-{len(self.search_results)}) or 'q' to search again: ").strip()
+                # State 2: Get track/album selection
+                selection = input(f"\nSelect {self.search_type} (1-{len(self.search_results)}) or 'q' to search again: ").strip()
 
                 if selection.lower() in ['q', 'quit']:
                     print("Returning to search...\n")
