@@ -28,7 +28,7 @@ Check if a tmux session exists by name.
 
 **Usage:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py find_session <session_name>
+tmux_tool find_session <session_name>
 ```
 
 **Returns:**
@@ -37,7 +37,7 @@ python3 .claude/skills/tmux-tool/tmux_tool.py find_session <session_name>
 
 **Example:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py find_session sonos
+tmux_tool find_session sonos
 # Output: Session found: sonos (ID: $0, Windows: 1)
 ```
 
@@ -48,7 +48,7 @@ Create a new detached tmux session.
 
 **Usage:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py create_session <session_name>
+tmux_tool create_session <session_name>
 ```
 
 **Returns:**
@@ -57,7 +57,7 @@ python3 .claude/skills/tmux-tool/tmux_tool.py create_session <session_name>
 
 **Example:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py create_session sonos
+tmux_tool create_session sonos
 # Output: Session 'sonos' created successfully
 ```
 
@@ -68,7 +68,7 @@ Get pane ID for session (auto-creates session if doesn't exist).
 
 **Usage:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py get_pane <session_name>
+tmux_tool get_pane <session_name>
 ```
 
 **Returns:**
@@ -77,7 +77,7 @@ python3 .claude/skills/tmux-tool/tmux_tool.py get_pane <session_name>
 
 **Example:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py get_pane sonos
+tmux_tool get_pane sonos
 # Output: %0
 ```
 
@@ -90,7 +90,7 @@ Capture content from a tmux pane.
 
 **Usage:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane <pane_id> [lines]
+tmux_tool capture_pane <pane_id> [lines]
 ```
 
 **Parameters:**
@@ -103,7 +103,7 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane <pane_id> [lines]
 
 **Example:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+tmux_tool capture_pane %0 40
 # Output: <current TUI display content>
 ```
 
@@ -120,7 +120,7 @@ Send keystrokes to a tmux pane.
 
 **Usage:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys <pane_id> <text> [enter]
+tmux_tool send_keys <pane_id> <text> [enter]
 ```
 
 **Parameters:**
@@ -140,10 +140,10 @@ Always use the pane ID returned from `get_pane` or `session_ready` (e.g., "%0"),
 
 **Example:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "search Heart of Gold Neil Young"
+tmux_tool send_keys %0 "search Heart of Gold Neil Young"
 # Output: Keys sent to pane %0
 
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1" false
+tmux_tool send_keys %0 "1" false
 # Output: Keys sent to pane %0 (no Enter pressed)
 ```
 
@@ -160,7 +160,7 @@ Ensure session exists and return pane ID (all-in-one).
 
 **Usage:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py session_ready <session_name>
+tmux_tool session_ready <session_name>
 ```
 
 **Returns:**
@@ -170,7 +170,7 @@ python3 .claude/skills/tmux-tool/tmux_tool.py session_ready <session_name>
 
 **Example:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos
+tmux_tool session_ready sonos
 # Output: Session 'sonos' existing. Pane ready: %0
 # or
 # Output: Session 'sonos' created. Pane ready: %0
@@ -188,25 +188,25 @@ python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos
 
 **1. Setup session and get pane:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos
+tmux_tool session_ready sonos
 # Output: Session 'sonos' created. Pane ready: %0
 ```
 
 **2. Capture current TUI state:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+tmux_tool capture_pane %0 40
 # Read what's on screen
 ```
 
 **3. Send input to TUI:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "search query"
+tmux_tool send_keys %0 "search query"
 # TUI receives "search query" + Enter
 ```
 
 **4. Capture updated state:**
 ```bash
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+tmux_tool capture_pane %0 40
 # See TUI response
 ```
 
@@ -231,32 +231,41 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
 
 ```bash
 # 1. Get pane ID (CRITICAL: Save this for all subsequent commands!)
-PANE_ID=$(python3 .claude/skills/tmux-tool/tmux_tool.py get_pane sonos)
+PANE_ID=$(tmux_tool get_pane sonos)
 # Returns: %0
 
 # 2. Check TUI status (optional)
-python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_status
+sonos_tool tui_status
 # Returns: running, pane_id: %0, current_prompt: search
 
 # 3. Capture TUI display (use PANE_ID, NOT "sonos"!)
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+tmux_tool capture_pane %0 40
 # See search prompt
 
 # 4. Send search query (track search - default)
 # CRITICAL: Use %0 (pane ID), NOT "sonos 0" or "sonos"!
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Heart of Gold Neil Young"
+tmux_tool send_keys %0 "Heart of Gold Neil Young"
 
-# 4. Capture search results
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 60
+# 5. Wait for TUI to show selection prompt (CRITICAL - do NOT use sleep!)
+sonos_tool tui_wait_for_prompt select
+
+# 6. Capture search results
+tmux_tool capture_pane %0 60
 # See numbered track list
 
-# 5. Select track
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
+# 7. Select track
+tmux_tool send_keys %0 "1"
 
-# 6. Confirm add/play
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
+# 8. Wait for TUI to show play prompt
+sonos_tool tui_wait_for_prompt play
 
-# 7. Back to search prompt (repeat as needed)
+# 9. Confirm add/play
+tmux_tool send_keys %0 "y"
+
+# 10. Wait for return to search prompt
+sonos_tool tui_wait_for_prompt search
+
+# 11. Back to search prompt (repeat as needed)
 ```
 
 **Typical interaction cycle for album search:**
@@ -265,20 +274,29 @@ python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
 # 1-2. Same as above (check status, capture display)
 
 # 3. Send album search query (note the "album:" prefix)
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "album: Harvest Neil Young"
+tmux_tool send_keys %0 "album: Harvest Neil Young"
 
-# 4. Capture album search results
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 60
+# 4. Wait for TUI to show selection prompt (CRITICAL - do NOT use sleep!)
+sonos_tool tui_wait_for_prompt select
+
+# 5. Capture album search results
+tmux_tool capture_pane %0 60
 # See numbered album list
 
-# 5. Select album
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
+# 6. Select album
+tmux_tool send_keys %0 "1"
 # Adds all album tracks to queue
 
-# 6. Confirm add/play
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
+# 7. Wait for TUI to show play prompt
+sonos_tool tui_wait_for_prompt play
 
-# 7. Back to search prompt (can mix track/album searches)
+# 8. Confirm add/play
+tmux_tool send_keys %0 "y"
+
+# 9. Wait for return to search prompt
+sonos_tool tui_wait_for_prompt search
+
+# 10. Back to search prompt (can mix track/album searches)
 ```
 
 ---
@@ -290,12 +308,34 @@ The TUI lifecycle tools in sonos_tool.py manage the interactive TUI process:
 **tui_status** - Check if TUI is running
 **tui_start** - Launch TUI in tmux session
 **tui_stop** - Gracefully stop TUI
+**tui_wait_for_prompt** - Wait for TUI to reach specific prompt state (NEW!)
+
+**IMPORTANT - Use tui_wait_for_prompt instead of sleep:**
+The new `tui_wait_for_prompt` tool polls the TUI state file and waits for prompt transitions. This is **3-4x faster** (300-1000ms) than using fixed sleep times (3-4 seconds) and is **more reliable**.
+
+**Old way (slow):**
+```bash
+send_keys %0 "search query"
+sleep 2 && capture_pane %0      # Fixed wait - too slow!
+```
+
+**New way (fast):**
+```bash
+send_keys %0 "search query"
+tui_wait_for_prompt select      # Waits only as long as needed (100-500ms typical)
+capture_pane %0
+```
+
+See the sonos-direct-code skill for complete tui_wait_for_prompt documentation.
 
 **Combined workflow:**
 1. Use **sonos_tool.py tui_start** to launch TUI
 2. Use **tmux_tool.py session_ready** to get pane ID
-3. Use **tmux_tool.py capture_pane/send_keys** for interaction
-4. Use **sonos_tool.py tui_stop** to gracefully exit
+3. Use **tmux_tool.py send_keys** to send input
+4. Use **sonos_tool.py tui_wait_for_prompt** to wait for TUI readiness (replaces sleep)
+5. Use **tmux_tool.py capture_pane** to read TUI state
+6. Repeat steps 3-5 for continued interaction
+7. Use **sonos_tool.py tui_stop** to gracefully exit
 
 ---
 
@@ -330,28 +370,28 @@ The TUI lifecycle tools in sonos_tool.py manage the interactive TUI process:
 ### Session Not Found
 ```bash
 # Check if session exists
-python3 .claude/skills/tmux-tool/tmux_tool.py find_session sonos
+tmux_tool find_session sonos
 
 # Create if missing
-python3 .claude/skills/tmux-tool/tmux_tool.py create_session sonos
+tmux_tool create_session sonos
 
 # Or use session_ready (auto-creates)
-python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos
+tmux_tool session_ready sonos
 ```
 
 ### Pane Not Responding
 ```bash
 # Verify pane exists
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0
+tmux_tool capture_pane %0
 
 # If error, get fresh pane ID
-python3 .claude/skills/tmux-tool/tmux_tool.py get_pane sonos
+tmux_tool get_pane sonos
 ```
 
 ### TUI State Unclear
 ```bash
 # Capture more lines to see full context
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 100
+tmux_tool capture_pane %0 100
 ```
 
 ---
@@ -383,31 +423,45 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 100
 ### Launch TUI and interact (full workflow)
 ```bash
 # 1. Start TUI process
-python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_start
+sonos_tool tui_start
 # Output: TUI started successfully on pane %0
 
 # 2. Verify session ready
-python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos
+tmux_tool session_ready sonos
 # Output: Session 'sonos' existing. Pane ready: %0
 
 # 3. Capture to see current state
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0
+tmux_tool capture_pane %0
 # Output: Enter search query (or 'quit' to exit):
 
 # 4. Send search query
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "neil young"
+tmux_tool send_keys %0 "neil young"
 # Output: Keys sent to pane %0
 
-# 5. Capture results
-python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 40
+# 5. Wait for TUI to show results (RECOMMENDED - replaces sleep)
+sonos_tool tui_wait_for_prompt select
+# Output: TUI ready at 'select' prompt (waited 0.25s)
+
+# 6. Capture results
+tmux_tool capture_pane %0 40
 # Output: <numbered search results>
 
-# 6. Select and add track
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "2"
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
+# 7. Select track
+tmux_tool send_keys %0 "2"
 
-# 7. Stop TUI when done
-python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_stop
+# 8. Wait for play prompt
+sonos_tool tui_wait_for_prompt play
+# Output: TUI ready at 'play' prompt (waited 0.12s)
+
+# 9. Confirm playback
+tmux_tool send_keys %0 "y"
+
+# 10. Wait for return to search
+sonos_tool tui_wait_for_prompt search
+# Output: TUI ready at 'search' prompt (waited 0.08s)
+
+# 11. Stop TUI when done
+sonos_tool tui_stop
 # Output: TUI stopped successfully
 ```
 

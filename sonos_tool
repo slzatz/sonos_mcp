@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper script for sonos_tool.py
+# This allows calling the Sonos dispatcher tool with just: sonos_tool [args...]
+exec /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_tool.py "$@"

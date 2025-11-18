@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/slzatz/sonos_mcp/.venv/bin/python3
 """
 tmux Tool Dispatcher for Direct Mode
 

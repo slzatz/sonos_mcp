@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper script for sonos_interactive_tui.py
+# This allows calling the interactive TUI with just: sonos_tui
+exec /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_interactive_tui.py "$@"

@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper script for tmux_tool.py
+# This allows calling the tmux dispatcher tool with just: tmux_tool [args...]
+exec /home/slzatz/sonos_mcp/.claude/skills/tmux-tool/tmux_tool.py "$@"

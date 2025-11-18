@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+#!/home/slzatz/sonos_mcp/.venv/bin/python3
 """
 Sonos Tool Dispatcher for Direct Mode
 
 Exposes sonos_actions functions as discrete command-line tools.
 Usage: sonos_tool.py <tool_name> [args...]
 
-This dispatcher provides 21 tools matching the MCP server functionality,
-but executes directly without MCP protocol overhead for token efficiency.
+This dispatcher provides 23 active tools (19 Sonos + 4 TUI lifecycle),
+matching MCP functionality but executing directly for token efficiency.
 """
 
 import sys
@@ -636,6 +636,88 @@ def tui_stop(args):
         return handle_error(e, "tui_stop")
 
 
+@tool("tui_wait_for_prompt")
+def tui_wait_for_prompt(args):
+    """Wait for TUI to reach a specific prompt state.
+
+    This tool efficiently polls the TUI state file instead of using fixed sleep times.
+    Use this after sending commands to wait for TUI to be ready for next input.
+
+    Args:
+        expected_prompt: One of 'search', 'select', 'play'
+        timeout: Optional timeout in seconds (default: 5.0)
+
+    Returns:
+        Success message with elapsed time when prompt reached, or timeout error
+
+    Example workflow:
+        1. send_keys "album: Harvest Moon"
+        2. tui_wait_for_prompt "select"  # Wait until TUI shows selection prompt
+        3. capture_pane to see results
+        4. send_keys "1"
+        5. tui_wait_for_prompt "play"    # Wait until TUI asks about playback
+        6. send_keys "y"
+        7. tui_wait_for_prompt "search"  # Wait until back to search prompt
+    """
+    if len(args) < 3:
+        return "Error: expected_prompt required (one of: search, select, play)"
+
+    expected_prompt = args[2]
+    valid_prompts = {'search', 'select', 'play'}
+
+    if expected_prompt not in valid_prompts:
+        return f"Error: expected_prompt must be one of: {', '.join(sorted(valid_prompts))}"
+
+    # Parse optional timeout (default 5 seconds)
+    timeout = 5.0
+    if len(args) >= 4:
+        try:
+            timeout = float(args[3])
+            if timeout <= 0:
+                return "Error: timeout must be positive"
+        except ValueError:
+            return "Error: timeout must be a number"
+
+    state_file = Path.home() / ".sonos" / "tui_state.json"
+    start_time = time.time()
+    poll_interval = 0.1  # Poll every 100ms
+
+    while time.time() - start_time < timeout:
+        try:
+            if state_file.exists():
+                with open(state_file) as f:
+                    state = json.load(f)
+
+                current_prompt = state.get("current_prompt")
+
+                # Check if we've reached the expected prompt
+                if current_prompt == expected_prompt:
+                    elapsed = time.time() - start_time
+                    return f"TUI ready at '{expected_prompt}' prompt (waited {elapsed:.2f}s)"
+
+            # Sleep before next poll
+            time.sleep(poll_interval)
+
+        except json.JSONDecodeError:
+            # State file might be mid-write, retry
+            time.sleep(poll_interval)
+            continue
+        except Exception as e:
+            return f"Error checking TUI state: {e}"
+
+    # Timeout reached - provide diagnostic info
+    try:
+        if state_file.exists():
+            with open(state_file) as f:
+                state = json.load(f)
+            current = state.get("current_prompt", "unknown")
+            return f"Timeout waiting for '{expected_prompt}' prompt (currently at: '{current}', waited {timeout:.1f}s)"
+    except:
+        pass
+
+    return f"Timeout waiting for '{expected_prompt}' prompt (waited {timeout:.1f}s)"
+
+
 def main():
     """Main dispatcher entry point."""
     if len(sys.argv) < 2:
@@ -655,7 +737,7 @@ def main():
         sys.exit(1)
 
     # Initialize speaker (except for tools that don't need speaker connection)
-    no_speaker_tools = {"get_master_speaker", "tui_status", "tui_start", "tui_stop"}
+    no_speaker_tools = {"get_master_speaker", "tui_status", "tui_start", "tui_stop", "tui_wait_for_prompt"}
     if tool_name not in no_speaker_tools:
         initialize_speaker()
 

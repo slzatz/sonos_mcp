@@ -64,6 +64,7 @@ class SonosSDKAgent:
             venv_python = project_root / ".venv" / "bin" / "python3"
 
             self.options = ClaudeAgentOptions(
+                model="claude-haiku-4-5",  # Use Haiku for cost efficiency
                 mcp_servers={
                     "sonos": {
                         "command": str(venv_python),
@@ -100,7 +101,6 @@ class SonosSDKAgent:
                 ],
                 system_prompt=SONOS_SYSTEM_PROMPT,
                 setting_sources=["project"],  # Enable loading of project-level skills from ~/.claude/
-                # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
                 permission_mode="bypassPermissions",  # Auto-execute tools without prompting
                 resume=resume_session if resume_session else None,
                 continue_conversation=continue_conversation
@@ -109,9 +109,9 @@ class SonosSDKAgent:
             # Direct mode: Use direct Python calls via Bash for Sonos (sonos_tool.py)
             # and tmux operations (tmux_tool.py). No MCP servers needed.
             self.options = ClaudeAgentOptions(
+                model="claude-haiku-4-5",  # Use Haiku for cost efficiency
                 system_prompt=SONOS_DIRECT_MODE_PROMPT,
                 setting_sources=["project"],  # Enable loading of project-level skills from ~/.claude/
-                # model parameter omitted - uses Claude Code CLI default (Claude Sonnet 4.5)
                 permission_mode="bypassPermissions",  # Auto-execute tools without prompting
                 resume=resume_session if resume_session else None,
                 continue_conversation=continue_conversation
@@ -253,6 +253,7 @@ async def main():
 
     print("🎵 Sonos Claude SDK Agent")
     print("=" * 40)
+    print(f"🤖 Model: Claude Haiku 4.5 (cost-efficient)")
     print(f"🎛️  Mode: {args.mode.upper()} {'(MCP server)' if args.mode == 'mcp' else '(direct Python)'}")
     if args.prompt:
         print("⚡ Headless mode - executing single prompt")

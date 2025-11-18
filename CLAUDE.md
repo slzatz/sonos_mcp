@@ -51,9 +51,10 @@ Sonos Speakers (network)
 User/Client
     ↓
 Claude Agent SDK (claude_sdk_agent/)
-    ↓ Bash tool → CLI Dispatchers:
-    │   ├── sonos_tool.py (22 Sonos tools)
-    │   └── tmux_tool.py (6 tmux tools for TUI)
+    ↓ Bash tool → Wrapper Scripts (in ~/.local/bin/):
+    │   ├── sonos_tool → sonos_tool.py (23 Sonos tools)
+    │   ├── tmux_tool → tmux_tool.py (6 tmux tools for TUI)
+    │   └── sonos_tui → sonos_interactive_tui.py (Interactive TUI)
     ↓ Direct Python imports
 Sonos Actions Library (sonos/)
     ↓ SoCo Library
@@ -105,7 +106,7 @@ sonos_mcp/
 │       │       └── search_tips.md
 │       ├── sonos-direct-code/  # Direct mode: Dispatcher tool interface
 │       │   ├── SKILL.md        # Tool documentation and workflows (includes TUI guide)
-│       │   └── sonos_tool.py   # CLI dispatcher (22 active tools: 19 Sonos + 3 TUI lifecycle)
+│       │   └── sonos_tool.py   # CLI dispatcher (23 active tools: 19 Sonos + 4 TUI lifecycle)
 │       └── tmux-tool/          # Direct mode: tmux CLI dispatcher for TUI interaction
 │           ├── SKILL.md        # tmux tool documentation and TUI workflows
 │           └── tmux_tool.py    # CLI dispatcher (6 tools: session mgmt + TUI interaction)
@@ -131,10 +132,19 @@ sonos_mcp/
 │   └── .env                    # ANTHROPIC_API_KEY (gitignored)
 │
 ├── sonos_interactive_tui.py    # Interactive TUI for tmux-based workflows
+├── sonos_tool                  # Bash wrapper script for sonos_tool.py (copy to ~/.local/bin/)
+├── tmux_tool                   # Bash wrapper script for tmux_tool.py (copy to ~/.local/bin/)
+├── sonos_tui                   # Bash wrapper script for sonos_interactive_tui.py (copy to ~/.local/bin/)
 ├── pyproject.toml              # Project dependencies and metadata
 ├── CLAUDE.md                   # This file
 ├── IMPLEMENTATION_SUMMARY.md   # Technical implementation details
 └── README.md                   # User-facing documentation
+
+# User installation (wrapper scripts for simplified commands)
+~/.local/bin/
+├── sonos_tool                  # Wrapper → calls sonos_tool.py with venv Python
+├── tmux_tool                   # Wrapper → calls tmux_tool.py with venv Python
+└── sonos_tui                   # Wrapper → calls sonos_interactive_tui.py with venv Python
 
 # Runtime state (created at runtime, not in repo)
 ~/.sonos/
@@ -169,14 +179,14 @@ sonos_mcp/
 **Sonos Direct Code Skill** (`.claude/skills/sonos-direct-code/`) - Used in **Direct mode**:
 - **`SKILL.md`**: Comprehensive dispatcher tool documentation
   - YAML frontmatter: name and description for auto-discovery
-  - Tool descriptions: 22 CLI tools with arguments and usage examples (19 Sonos + 3 TUI lifecycle)
+  - Tool descriptions: 23 CLI tools with arguments and usage examples (19 Sonos + 4 TUI lifecycle)
   - Recommended tools: Current, working tools matching MCP functionality
   - Common workflows: Search/play, custom playlists, queue analysis
-  - Execution patterns: CLI command structure and examples
-  - Best practices: Error handling, two-step patterns, position indexing
-  - TUI lifecycle management: tui_status, tui_start, tui_stop tools
+  - Execution patterns: Simplified commands via wrapper scripts (sonos_tool, tmux_tool, sonos_tui)
+  - Best practices: Error handling, two-step patterns, position indexing, state-based timing
+  - TUI lifecycle management: tui_status, tui_start, tui_stop, tui_wait_for_prompt tools
 - **`sonos_tool.py`**: Command-line dispatcher
-  - 22 active tools: 19 Sonos tools (2 search tools commented out) + 3 TUI lifecycle tools
+  - 23 active tools: 19 Sonos tools (2 search tools commented out) + 4 TUI lifecycle tools
   - Automatic speaker initialization (except for TUI lifecycle tools)
   - Standardized error handling and output formatting
   - 1-indexed positions for user-friendly CLI experience
@@ -300,10 +310,11 @@ sonos_mcp/
 - `list_native_sonos_playlists` - Display all native Sonos playlists stored on Sonos system
 - `create_native_sonos_playlist_from_local` - Convert local playlist to native Sonos playlist (accessible in Sonos app)
 
-*TUI Lifecycle Management (3 tools):*
+*TUI Lifecycle Management (4 tools):*
 - `tui_status` - Check TUI running status (returns JSON state)
 - `tui_start` - Start TUI in tmux session (auto-creates session if needed)
 - `tui_stop` - Gracefully stop running TUI instance
+- `tui_wait_for_prompt` - Wait for TUI to reach specific prompt state (search/select/play)
 
 **Server Initialization:**
 - Connects to master speaker with retry logic (up to 10 attempts)
@@ -782,7 +793,7 @@ The direct mode dispatcher (`sonos_tool.py`) provides a stable CLI interface for
 
 4. Test from command line:
    ```bash
-   .venv/bin/python3 .claude/skills/sonos-direct-code/sonos_tool.py your_tool_name test_arg
+   sonos_tool your_tool_name test_arg
    ```
 
 **Design principles:**
@@ -805,11 +816,11 @@ This maintains parity between direct and MCP modes.
 
 **TUI Lifecycle Tools:**
 
-The dispatcher includes three special tools for managing the interactive TUI:
+The dispatcher includes four special tools for managing the interactive TUI:
 - Not part of the core 21 Sonos tools
 - Enable programmatic TUI lifecycle management
 - Use state file (`~/.sonos/tui_state.json`) for coordination
-- Allow agents to check TUI status, start, and stop TUI programmatically
+- Allow agents to check TUI status, start/stop TUI, and wait for state transitions
 - Bridge the gap between stateless CLI operations and stateful TUI workflows
 - Do not require speaker initialization (excluded from `no_speaker_tools` set)
 
@@ -818,6 +829,7 @@ These tools simplify TUI session management compared to manual tmux commands, pr
 - Atomic state file updates
 - Graceful shutdown mechanisms
 - Error prevention (e.g., detecting already-running instances)
+- State-based timing via `tui_wait_for_prompt` (replaces fixed sleep times with efficient polling)
 
 ### Testing
 
