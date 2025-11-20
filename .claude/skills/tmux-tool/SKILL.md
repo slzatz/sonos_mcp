@@ -253,19 +253,14 @@ sonos_tool tui_wait_for_prompt select
 tmux_tool capture_pane %0 60
 # See numbered track list
 
-# 7. Select track
-tmux_tool send_keys %0 "1"
+# 7. Select track (single or multi-select)
+tmux_tool send_keys %0 "1"          # Single selection
+# Or: tmux_tool send_keys %0 "1 3 5"  # Multi-selection
 
-# 8. Wait for TUI to show play prompt
-sonos_tool tui_wait_for_prompt play
-
-# 9. Confirm add/play
-tmux_tool send_keys %0 "y"
-
-# 10. Wait for return to search prompt
+# 8. Wait for return to search prompt
 sonos_tool tui_wait_for_prompt search
 
-# 11. Back to search prompt (repeat as needed)
+# 9. Back to search prompt (repeat as needed or use play_from_queue)
 ```
 
 **Typical interaction cycle for album search:**
@@ -283,20 +278,15 @@ sonos_tool tui_wait_for_prompt select
 tmux_tool capture_pane %0 60
 # See numbered album list
 
-# 6. Select album
-tmux_tool send_keys %0 "1"
+# 6. Select album (single or multi-select)
+tmux_tool send_keys %0 "1"          # Single album
+# Or: tmux_tool send_keys %0 "1 3"   # Multiple albums
 # Adds all album tracks to queue
 
-# 7. Wait for TUI to show play prompt
-sonos_tool tui_wait_for_prompt play
-
-# 8. Confirm add/play
-tmux_tool send_keys %0 "y"
-
-# 9. Wait for return to search prompt
+# 7. Wait for return to search prompt
 sonos_tool tui_wait_for_prompt search
 
-# 10. Back to search prompt (can mix track/album searches)
+# 8. Back to search prompt (can mix track/album searches or use play_from_queue)
 ```
 
 ---
@@ -308,10 +298,10 @@ The TUI lifecycle tools in sonos_tool.py manage the interactive TUI process:
 **tui_status** - Check if TUI is running
 **tui_start** - Launch TUI in tmux session
 **tui_stop** - Gracefully stop TUI
-**tui_wait_for_prompt** - Wait for TUI to reach specific prompt state (NEW!)
+**tui_wait_for_prompt** - Wait for TUI to reach specific prompt state (search or select)
 
 **IMPORTANT - Use tui_wait_for_prompt instead of sleep:**
-The new `tui_wait_for_prompt` tool polls the TUI state file and waits for prompt transitions. This is **3-4x faster** (300-1000ms) than using fixed sleep times (3-4 seconds) and is **more reliable**.
+The `tui_wait_for_prompt` tool polls the TUI state file and waits for prompt transitions. This is **2-3x faster** (200-700ms) than using fixed sleep times (2-3 seconds) and is **more reliable**.
 
 **Old way (slow):**
 ```bash

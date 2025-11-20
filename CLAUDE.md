@@ -359,7 +359,7 @@ sonos_mcp/
 
 ### 5. Interactive TUI (`sonos_interactive_tui.py`)
 
-**Purpose**: Experimental interactive terminal UI for track and album search-and-play workflows using tmux.
+**Purpose**: Experimental interactive terminal UI for track and album search and queue building workflows using tmux.
 
 **Key Innovation**: Demonstrates how AI agents can interact with TUI applications through tmux by:
 - Launching a persistent TUI process (via tui_start from sonos_tool.py)
@@ -377,18 +377,19 @@ sonos_mcp/
 **Workflow:**
 1. **Search**: Agent sends search query (track or album) → TUI displays numbered results
 2. **Analyze**: Agent captures and examines results
-3. **Select**: Agent sends item number → TUI adds to queue
-   - Tracks: Single track added at end of queue
+3. **Select**: Agent sends one or more item numbers → TUI adds to queue
+   - Single selection: `"1"` → Single item added
+   - Multi-selection: `"1 3 5"` → Multiple items added efficiently
+   - Tracks: Added at end of queue
    - Albums: All album tracks added sequentially to queue
-4. **Play Decision**: Agent chooses to play immediately (y) or queue only (n)
-   - Tracks: Plays the single added track
-   - Albums: Plays from first track of album (intelligent position tracking)
-5. **Loop**: TUI returns to search prompt for next operation
+4. **Loop**: TUI returns to search prompt for next operation
+5. **Playback**: Agent uses `play_from_queue` tool for playback control
 
 **Advantages over CLI Dispatcher:**
 - **Stateful**: Single running process maintains context
-- **Integrated**: Search → select → play in one session
-- **Efficient**: Fewer tool calls for multi-track operations
+- **Integrated**: Search → select workflow in one session
+- **Efficient**: Multi-selection reduces redundant searches
+- **Flexible**: Agent has explicit control over playback timing
 - **Natural**: Mirrors human TUI interaction patterns
 
 **When to Use:**
@@ -451,7 +452,7 @@ The TUI can be managed programmatically using three lifecycle tools in the CLI d
 
 The state file is updated at key points:
 - TUI startup (status: "running", prompt: "search")
-- Prompt transitions (search → select → play → search)
+- Prompt transitions (search → select → search)
 - TUI exit (status: "stopped")
 - State written atomically (temp file + rename) to prevent corruption
 
@@ -468,17 +469,20 @@ The TUI intelligently handles both track and album searches with different behav
 
 **Track Search:**
 - Saves results as dictionaries: `{"title": "...", "artist": "...", "album": "...", "item_id": "...", "uri": "..."}`
-- Adds single track to queue
-- Returns queue position of added track for playback
+- Adds single track to queue (or multiple with multi-selection)
+- Reports queue position(s) for agent's reference
 
 **Album Search:**
 - Saves results as dictionaries: `{"title": "Album Name", "artist": "...", "album": "Album Name", "item_id": "...", "uri": "..."}`
-- Adds all album tracks to queue sequentially
+- Adds all album tracks to queue sequentially (or multiple albums with multi-selection)
 - Tracks queue position BEFORE adding to determine first track position
-- Returns first track position (not last) for correct album playback
-- Example: Album with 10 tracks added to queue at positions 15-24 → returns position 15 for playback
+- Reports first and last positions for agent's reference
+- Example: Album with 10 tracks added to queue at positions 15-24 → reports positions 15-24
 
-This design ensures that when an album is selected for immediate playback, it starts from the beginning of the album, not the last track.
+**Multi-Selection:**
+- Supports selecting multiple items in one operation (e.g., `"1 3 5"`)
+- Reduces redundant searches when building queues
+- Reports cumulative range of queue positions for all added items
 
 **Compatibility:**
 - Saves search results to same JSON files as CLI tools

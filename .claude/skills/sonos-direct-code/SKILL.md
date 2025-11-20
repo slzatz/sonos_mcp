@@ -1,11 +1,61 @@
 ---
 name: sonos-direct-code
-description: "[DIRECT MODE - DEFAULT] Direct Python access to Sonos control via dispatcher tool. Use this skill for ALL Sonos requests when running in direct mode (default). Provides 23 active tools (19 Sonos + 4 TUI lifecycle) matching MCP mode functionality."
+description: "[DIRECT MODE - DEFAULT] Sonos control via CLI dispatchers ONLY. NEVER import sonos_actions or write Python scripts - this bypasses architecture and is FORBIDDEN. ALL searches use Interactive TUI (mandatory). Use ONLY sonos_tool.py (23 tools: 19 Sonos + 4 TUI lifecycle) and tmux_tool.py (6 tools). If tools fail, REPORT error - never improvise workarounds."
 ---
 
 # Sonos Direct Code Access Skill
 
 This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py`) for Sonos speaker control. The dispatcher exposes 23 active tools (19 Sonos tools + 4 TUI lifecycle management tools), all executing directly without protocol overhead for maximum token efficiency.
+
+## ⚠️ CRITICAL: What You CANNOT Do
+
+**NEVER do any of these - they violate the architecture:**
+
+❌ **Import or call sonos_actions directly:**
+```python
+# FORBIDDEN - DO NOT DO THIS
+from sonos import sonos_actions
+python3 << 'EOF'
+from sonos import sonos_actions
+results = sonos_actions.search_for_track("query")
+EOF
+```
+
+❌ **Write inline Python scripts to bypass dispatchers:**
+```bash
+# FORBIDDEN
+python3 -c "from sonos import sonos_actions; ..."
+```
+
+❌ **Read source files to reverse-engineer APIs:**
+```bash
+# FORBIDDEN
+cat /home/slzatz/sonos_mcp/sonos/sonos_actions.py
+grep "def search" sonos/sonos_actions.py
+```
+
+❌ **Use CLI search tools (they don't exist):**
+```bash
+# FORBIDDEN - these tools are commented out
+sonos_tool search_for_track "query"  # Does not exist
+sonos_tool search_for_album "query"  # Does not exist
+```
+
+✅ **You MUST:**
+- Use `sonos_tool` CLI for all Sonos operations
+- Use Interactive TUI (via tmux) for ALL search operations
+- Follow documented workflows exactly
+- Report errors rather than improvising workarounds
+
+**Why these restrictions exist:**
+- Direct Python access defeats token optimization (~15% overhead)
+- Bypassing tools breaks error handling and monitoring
+- "Working" via wrong methods creates technical debt
+- Architecture exists for performance and maintainability
+
+**Remember:** A properly reported failure > a working workaround that violates architecture.
+
+---
 
 ## Quick Start
 
@@ -20,7 +70,7 @@ This skill provides guidance for using the Sonos dispatcher tool (`sonos_tool.py
 sonos_tool <tool_name> [args...]
 ```
 
-**2. Interactive TUI** (ONLY used to search for tracks or albums and place them on the queue and OPTIONALLY to play the track immediately):
+**2. Interactive TUI** (ONLY used to search for tracks or albums and place them on the queue):
 
 **IMPORTANT: This is the ONLY use case for tmux tools (via tmux_tool.py dispatcher)!**
 
@@ -73,7 +123,7 @@ sonos_tool tui_status
 Returns JSON with:
 - `running`: true/false
 - `status`: "running", "stopped", "not_running", or "stale"
-- `current_prompt`: "search", "select", or "play" (if running)
+- `current_prompt`: "search" or "select" (if running)
 - `pid`: Process ID (if running)
 - `pane_id`: tmux pane ID (if running)
 
@@ -140,9 +190,10 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 60
 
 The `sonos_interactive_tui.py` script (located in project root) provides a running interactive interface that allows you to:
 1. Search for tracks or albums
-2. See results and select the best match
-3. Add to queue with the option of immediate playback
+2. See results and select one or more matches (multi-selection supported)
+3. Add to queue (automatically added, no playback prompt)
 4. Loop back for more searches - all within a single running process
+5. Agent uses `play_from_queue` for playback control
 
 **Search Type Control:**
 - **Track search (default):** Just enter your query (e.g., `Heart of Gold Neil Young`)
@@ -197,7 +248,11 @@ You'll see:
 ================================================================================
 Sonos Interactive Track and Album Search
 ================================================================================
-Commands: Type search query, track/album number, or 'quit' to exit
+Commands:
+  - Search: Enter artist/track name (or 'album: artist/album name')
+  - Select: Enter number(s) - single: '5' or multiple: '1 3 5'
+  - No selection: Enter '0' to search again
+  - Exit: Type 'quit'
 
 Initializing Sonos speaker...
 Connected to: Office2
@@ -238,21 +293,28 @@ Found 50 results:
 ...
 --------------------------------------------------------------------------------
 
-Select track (1-50) or 'q' to search again:
+Select track (1-50), multiple (e.g., '1 3 5'), or 0 for no selection:
 ```
 
 **Step 6: Analyze results and send selection**
 
-Examine the results and pick the best match. Send the item number (track or album):
+Examine the results and pick the best match. Send one or more item numbers (track or album):
 
 ```bash
+# Single selection
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
+
+# Multi-selection (space-separated numbers)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1 3 5"
+
+# No selection (return to search)
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "0"
 ```
 
-**Step 7: Wait for TUI to show play prompt**
+**Step 7: Wait for return to search prompt**
 ```bash
 # CRITICAL: Wait for TUI state transition - do NOT use sleep!
-python3 sonos_tool tui_wait_for_prompt play
+python3 sonos_tool tui_wait_for_prompt search
 ```
 
 **Step 8: Capture queue confirmation**
@@ -264,35 +326,18 @@ You'll see:
 ```
 Adding track 1 to queue...
 Track added at position 12.
-Play now? (y/n):
-```
-
-**Step 9: Choose whether to play immediately**
-
-```bash
-# To play now:
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
-
-# Or just queue it:
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
-```
-
-**Step 10: Wait for return to search prompt**
-```bash
-# CRITICAL: Wait for TUI state transition - do NOT use sleep!
-python3 sonos_tool tui_wait_for_prompt search
-```
-
-**Step 11: Loop continues**
-
-After your choice, the TUI returns to the search prompt:
-```
-Now playing track 12!
 
 ================================================================================
 
 Search:
 ```
+
+**Step 9: Loop continues or use play_from_queue**
+
+The TUI returns to search prompt. You can:
+- Search for more tracks
+- Exit TUI with "quit"
+- Use `sonos_tool play_from_queue 12` to start playback from position 12
 
 You can now search for another track, or quit:
 ```bash
@@ -313,9 +358,89 @@ While in the TUI, you can send:
   - For track search: `Heart of Gold Neil Young` (default)
   - For album search: `album: Harvest Neil Young` (preferred) or `album Harvest Neil Young`
   - **TIP:** Use colon for clarity, but space also works
-- **Track/Album number** (1-N at "Select track:" prompt)
-- **"q"** or **"quit"** (to exit TUI or return to search)
-- **"y"** or **"n"** (at "Play now?" prompt)
+- **Track/Album number(s)** (at "Select:" prompt)
+  - Single selection: `1`
+  - Multi-selection: `1 3 5` (space-separated numbers)
+  - No selection: `0` (returns to search)
+- **"quit"** (ONLY at Search prompt - exits TUI completely)
+
+**CRITICAL: '0' vs 'quit' Usage:**
+- At **Selection prompt**: Use `"0"` to skip selection and return to search
+  - ❌ DO NOT send "quit" or "q" at selection prompt - will cause error
+  - ✅ Send "0" to go back to search
+- At **Search prompt**: Use `"quit"` to exit the TUI completely
+  - ✅ Send "quit" when done with all searches
+  - Also accepts "q" or "exit" at search prompt
+
+**Example - Correct usage:**
+```bash
+# At search prompt
+send_keys %0 "Patty Griffin"
+wait_for_prompt select
+capture_pane %0
+# At selection prompt - decide not to select
+send_keys %0 "0"  # ✓ Returns to search
+# NOT: send_keys %0 "quit"  # ✗ Would cause error
+
+# At search prompt - done with TUI
+send_keys %0 "quit"  # ✓ Exits TUI
+```
+
+### TUI Lifecycle - Best Practices
+
+**Default Behavior: Keep Running**
+
+The TUI is designed for **continuous use** across multiple user requests. After completing searches:
+- ✅ **Leave TUI running** (do NOT call tui_stop)
+- ✅ TUI stays ready for next search request
+- ✅ No restart overhead for subsequent searches
+- ✅ Preserves stateful session context
+
+**Only Stop TUI When:**
+1. **User explicitly says they're done**: "that's all", "I'm done", "stop the TUI"
+2. **TUI encounters errors**: Use tui_stop → tui_start to restart
+3. **User directly requests it**: "please stop the TUI"
+
+**Anti-Pattern - Starting and Stopping Each Time:**
+```bash
+# ❌ INEFFICIENT - Don't do this
+# Request 1:
+tui_start
+send_keys %0 "Jackson Browne"
+[select tracks]
+tui_stop  # ❌ Unnecessary!
+
+# Request 2 (user asks for more songs):
+tui_start  # ❌ Wasteful restart
+send_keys %0 "Neil Young"
+[select tracks]
+tui_stop  # ❌ Still running/stopping unnecessarily
+```
+
+**Correct Pattern - Leave Running:**
+```bash
+# ✅ EFFICIENT - Do this
+# Request 1:
+tui_start
+send_keys %0 "Jackson Browne"
+[select tracks]
+# Leave running...
+
+# Request 2 (user asks for more songs):
+# No restart needed! TUI already running
+send_keys %0 "Neil Young"
+[select tracks]
+# Leave running...
+
+# User: "that's all for now"
+tui_stop  # ✓ Only stop when actually done
+```
+
+**Benefits of Keeping TUI Running:**
+- **Performance**: No tui_start overhead for each request (~1-2 seconds saved)
+- **Statefulness**: Maintains session context
+- **Simplicity**: One less tool call per request
+- **Natural**: Matches how humans use TUI applications
 
 ### TUI vs CLI Dispatcher Comparison
 
@@ -323,8 +448,10 @@ While in the TUI, you can send:
 |---------|----------------|----------------|
 | **Process lifecycle** | Runs continuously | Tool invoked per operation |
 | **State** | Maintains state | Stateless (reads from files) |
-| **Search workflow** | Integrated (search → select → play) | No search capability |
-| **Used for** | Searches, queue building | ALL other tasks |
+| **Search workflow** | Integrated (search → select) | No search capability |
+| **Playback control** | No (use play_from_queue) | Yes (play_from_queue, play_pause, etc.) |
+| **Multi-selection** | Yes (e.g., "1 3 5") | N/A |
+| **Used for** | Searches, queue building | ALL other tasks (incl. playback) |
 | **Uses tmux** | Yes | No |
 | **Control flow** | Sequential prompts | Explicit tool selection |
 
@@ -344,6 +471,38 @@ While in the TUI, you can send:
 - Compatible with existing search result caching
 - Requires tmux tools (via tmux_tool.py dispatcher from tmux-tool skill)
 
+**Known Issue - Amazon Music Authorization (Transient):**
+
+Amazon Music API occasionally returns "Authorization expired" errors even when authorization is valid. This is a **known transient glitch**, not a real problem.
+
+**Symptoms:**
+- Search returns "Authorization expired" error
+- Error occurs randomly, not consistently
+- Authorization is actually valid
+
+**Solution - Automatic Retry:**
+```bash
+# First attempt
+send_keys %0 "Patty Griffin"
+wait_for_prompt select
+capture_pane %0
+# If you see "Authorization expired" in output:
+
+# Simply retry immediately (usually succeeds)
+send_keys %0 "0"  # Go back to search
+wait_for_prompt search
+send_keys %0 "Patty Griffin"  # Same search again
+wait_for_prompt select
+capture_pane %0  # Usually works now
+```
+
+**Best Practice:**
+- If you see "Authorization expired": Retry once immediately
+- Do NOT report it as a real authorization problem
+- Do NOT try to re-authenticate
+- Usually resolves on second attempt (1-2 seconds later)
+- Only report if it persists after 2-3 retries
+
 **Features:**
 - Clear prompts designed for tmux capture
 - Error handling with user-friendly messages
@@ -352,7 +511,7 @@ While in the TUI, you can send:
 
 ### Example: Building a Queue with TUI
 
-Here's a complete example of using the TUI to build a queue of multiple tracks:
+Here's a complete example of using the TUI to build a queue with multiple tracks and multi-selection:
 
 ```bash
 # Step 0: Ensure "sonos" tmux session exists and launch TUI
@@ -364,8 +523,8 @@ python3 sonos_tool tui_start
 python3 .claude/skills/tmux-tool/tmux_tool.py session_ready sonos  # Get pane ID
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "cd /home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code && /home/slzatz/sonos_mcp/.venv/bin/python3 sonos_interactive_tui.py"
 
-# Search for first track
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Neil Young Heart of Gold"
+# Search for Bruce Springsteen tracks
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Bruce Springsteen"
 
 # CRITICAL: Wait for selection prompt (do NOT use sleep!)
 python3 sonos_tool tui_wait_for_prompt select
@@ -373,14 +532,8 @@ python3 sonos_tool tui_wait_for_prompt select
 # Capture results
 python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0
 
-# Select track 1
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
-
-# Wait for play prompt
-python3 sonos_tool tui_wait_for_prompt play
-
-# Queue, don't play yet
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
+# Multi-select three great tracks
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "2 5 8"
 
 # Wait for return to search
 python3 sonos_tool tui_wait_for_prompt search
@@ -397,17 +550,11 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0
 # Select album 1
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
 
-# Wait for play prompt
-python3 sonos_tool tui_wait_for_prompt play
-
-# Queue all tracks, don't play yet
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
-
 # Wait for return to search
 python3 sonos_tool tui_wait_for_prompt search
 
-# Search for third track
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Leonard Cohen Suzanne"
+# Search for Leonard Cohen
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "Leonard Cohen"
 
 # Wait for selection prompt
 python3 sonos_tool tui_wait_for_prompt select
@@ -415,23 +562,25 @@ python3 sonos_tool tui_wait_for_prompt select
 # Capture results
 python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0
 
-# Select track 1
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
-
-# Wait for play prompt
-python3 sonos_tool tui_wait_for_prompt play
-
-# Queue and start playing!
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
+# Multi-select two tracks
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1 4"
 
 # Wait for return to search
 python3 sonos_tool tui_wait_for_prompt search
 
 # Exit TUI
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "quit"
+
+# Now use CLI dispatcher to check queue and start playback
+python3 sonos_tool list_queue
+# Agent determines first new position (let's say it was 10)
+python3 sonos_tool play_from_queue 10
 ```
 
-This builds a queue with tracks and a full album, then starts playback - all within one continuous TUI session. The example demonstrates mixing track searches with album searches using the `album:` prefix.
+This builds a queue with multi-selected tracks and a full album, then uses `play_from_queue` for playback control. The example demonstrates:
+- Multi-selection efficiency (one search for multiple Bruce Springsteen tracks)
+- Mixing track searches with album searches using the `album:` prefix
+- Separation of concerns (TUI for search/selection, CLI dispatcher for playback)
 
 ## When to Use Direct Mode
 
@@ -748,16 +897,16 @@ Wait for the TUI to reach a specific prompt state.
 
 **IMPORTANT: Use this instead of fixed sleep times for faster, more reliable TUI interactions!**
 
-This tool efficiently polls the TUI state file (`~/.sonos/tui_state.json`) instead of using fixed sleep times. The TUI updates its state at key transitions (search → select → play → search), allowing the agent to know exactly when the TUI is ready for next input.
+This tool efficiently polls the TUI state file (`~/.sonos/tui_state.json`) instead of using fixed sleep times. The TUI updates its state at key transitions (search → select → search), allowing the agent to know exactly when the TUI is ready for next input.
 
 **Usage:**
 ```bash
 sonos_tool tui_wait_for_prompt select
-sonos_tool tui_wait_for_prompt play 3.0
+sonos_tool tui_wait_for_prompt search 3.0
 ```
 
 **Parameters:**
-- `expected_prompt`: One of `search`, `select`, `play` (required)
+- `expected_prompt`: One of `search`, `select` (required)
 - `timeout`: Optional timeout in seconds (default: 5.0)
 
 **How it works:**
@@ -793,15 +942,8 @@ python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_wait_for_prompt selec
 # Now capture results
 python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0
 
-# Send selection
+# Send selection (single or multi-select)
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
-
-# Wait for play prompt (100-300ms typically)
-python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_wait_for_prompt play
-# Returns: "TUI ready at 'play' prompt (waited 0.15s)"
-
-# Send play decision
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
 
 # Wait for return to search (100-200ms typically)
 python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_wait_for_prompt search
@@ -809,7 +951,7 @@ python3 .claude/skills/sonos-direct-code/sonos_tool.py tui_wait_for_prompt searc
 ```
 
 **Benefits:**
-- **3-4x faster** than fixed sleeps (300-1000ms total vs 3-4 seconds)
+- **2-3x faster** than fixed sleeps (200-700ms total vs 2-3 seconds)
 - **More reliable** - waits exactly until ready, not too short or too long
 - **Predictable** - agent doesn't have to guess sleep times
 - **Self-documenting** - shows actual wait time for diagnostics
@@ -822,13 +964,12 @@ Timeout waiting for 'select' prompt (currently at: 'search', waited 5.0s)
 
 **When to use:**
 - **After every send_keys to TUI** - replaces all `sleep && capture_pane` patterns
-- Between TUI state transitions (search → select → play)
+- Between TUI state transitions (search → select → search)
 - Before capturing pane to ensure TUI has updated display
 
 **Valid prompt values:**
 - `search` - TUI is at "Search:" prompt
-- `select` - TUI is at "Select track/album (1-N):" prompt
-- `play` - TUI is at "Play now? (y/n):" prompt
+- `select` - TUI is at "Select track/album (1-N), multiple, or 0:" prompt
 
 ## Common Workflows
 
@@ -891,7 +1032,11 @@ You'll see:
 ================================================================================
 Sonos Interactive Track and Album Search
 ================================================================================
-Commands: Type search query, track/album number, or 'quit' to exit
+Commands:
+  - Search: Enter artist/track name (or 'album: artist/album name')
+  - Select: Enter number(s) - single: '5' or multiple: '1 3 5'
+  - No selection: Enter '0' to search again
+  - Exit: Type 'quit'
 
 Initializing Sonos speaker...
 Connected to: Office2
@@ -932,21 +1077,25 @@ Found 50 results:
 ...
 --------------------------------------------------------------------------------
 
-Select the track or album (1-50) that best matches the request from the user or 'q' to search again:
+Select track/album (1-50), multiple (e.g., '1 3 5'), or 0 for no selection:
 ```
 
 **Step 6: Analyze results and send selection**
 
-Examine the results and pick the best match. Send the item number (track or album):
+Examine the results and pick the best match. Send one or more item numbers (track or album):
 
 ```bash
+# Single selection
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "3"
+
+# Or multi-selection
+python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "2 5 8"
 ```
 
-**Step 7: Wait for TUI to show play prompt**
+**Step 7: Wait for return to search prompt**
 ```bash
 # CRITICAL: Wait for TUI state transition - do NOT use sleep!
-python3 sonos_tool tui_wait_for_prompt play
+python3 sonos_tool tui_wait_for_prompt search
 ```
 
 **Step 8: Capture queue confirmation**
@@ -958,38 +1107,21 @@ You'll see:
 ```
 Adding track 3 to queue...
 Track added at position 12.
-Play now? (y/n):
-```
-
-**Step 9: Choose whether to play immediately**
-
-```bash
-# To play now:
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "y"
-
-# Or just queue it:
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
-```
-
-**Step 10: Wait for return to search prompt**
-```bash
-# CRITICAL: Wait for TUI state transition - do NOT use sleep!
-python3 sonos_tool tui_wait_for_prompt search
-```
-
-**Step 11: Loop continues**
-
-After your choice, the TUI returns to the search prompt:
-```
-Now playing track 12!
 
 ================================================================================
 
 Search:
 ```
 
-You can now search for another track, or quit:
+**Step 9: Use play_from_queue for playback**
+
+The TUI has added the track to the queue. Now use the CLI dispatcher for playback:
+
 ```bash
+# Play from the position where track was added
+python3 sonos_tool play_from_queue 12
+
+# Or continue searching and quit TUI
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "quit"
 ```
 
@@ -1021,12 +1153,6 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 50
 # Select first result
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
 
-# Wait for play prompt
-python3 sonos_tool tui_wait_for_prompt play
-
-# Queue without playing
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
-
 # Wait for return to search
 python3 sonos_tool tui_wait_for_prompt search
 
@@ -1044,12 +1170,6 @@ python3 .claude/skills/tmux-tool/tmux_tool.py capture_pane %0 50
 
 # Select first result
 python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "1"
-
-# Wait for play prompt
-python3 sonos_tool tui_wait_for_prompt play
-
-# Queue without playing
-python3 .claude/skills/tmux-tool/tmux_tool.py send_keys %0 "n"
 
 # Wait for return to search
 python3 sonos_tool tui_wait_for_prompt search

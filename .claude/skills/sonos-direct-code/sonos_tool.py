@@ -644,7 +644,7 @@ def tui_wait_for_prompt(args):
     Use this after sending commands to wait for TUI to be ready for next input.
 
     Args:
-        expected_prompt: One of 'search', 'select', 'play'
+        expected_prompt: One of 'search', 'select'
         timeout: Optional timeout in seconds (default: 5.0)
 
     Returns:
@@ -654,16 +654,15 @@ def tui_wait_for_prompt(args):
         1. send_keys "album: Harvest Moon"
         2. tui_wait_for_prompt "select"  # Wait until TUI shows selection prompt
         3. capture_pane to see results
-        4. send_keys "1"
-        5. tui_wait_for_prompt "play"    # Wait until TUI asks about playback
-        6. send_keys "y"
-        7. tui_wait_for_prompt "search"  # Wait until back to search prompt
+        4. send_keys "1 3 5"             # Select multiple albums
+        5. tui_wait_for_prompt "search"  # Wait until back to search prompt
+        6. (Agent uses play_from_queue for playback control)
     """
     if len(args) < 3:
-        return "Error: expected_prompt required (one of: search, select, play)"
+        return "Error: expected_prompt required (one of: search, select)"
 
     expected_prompt = args[2]
-    valid_prompts = {'search', 'select', 'play'}
+    valid_prompts = {'search', 'select'}
 
     if expected_prompt not in valid_prompts:
         return f"Error: expected_prompt must be one of: {', '.join(sorted(valid_prompts))}"
