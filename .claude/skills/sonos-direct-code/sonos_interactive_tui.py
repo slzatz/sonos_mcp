@@ -234,7 +234,7 @@ class SonosInteractiveTUI:
                 self.write_state(status="running", current_prompt="select")
 
                 # State 2: Get track/album selection
-                selection = input(f"\nSelect {self.search_type} (1-{len(self.search_results)}), multiple (e.g., '1 3 5'), or 0 for no selection: ").strip()
+                selection = input(f"\nSelect {self.search_type}(s) from list. (Multiple selections are separated by spaces. Use 0 for no selection): ").strip()
 
                 if selection == '0':
                     print("No selection made. Returning to search...\n")

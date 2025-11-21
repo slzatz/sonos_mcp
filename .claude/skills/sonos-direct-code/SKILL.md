@@ -204,6 +204,27 @@ The `sonos_interactive_tui.py` script (located in project root) provides a runni
 
 The TUI automatically detects the prefix and uses the appropriate search and add functions.
 
+**When to Use Track Search vs Album Search:**
+
+Use **TRACK search** when:
+- User specifies a number of songs ("3 tracks", "five songs", "a couple of tracks")
+- User wants "best of" or curated selection ("best songs", "greatest hits", "top tracks")
+- Building a varied queue with specific tracks
+- User says "songs" or "tracks" (not "album")
+- User wants cherry-picked selections from an artist's catalog
+
+Use **ALBUM search** when:
+- User explicitly says "play the album..."
+- User wants complete album playback
+- User mentions a specific album by name
+- User wants the full artistic work as intended
+
+**Examples:**
+- "Put three Tom Petty songs on the queue" → **Track search**
+- "Add some Aimee Mann best of tracks" → **Track search**
+- "Play the album Harvest by Neil Young" → **Album search**
+- "Add the Nebraska album" → **Album search**
+
 **This leverages tmux's ability to:**
 - Launch and keep a TUI running
 - Capture the current display state
@@ -386,6 +407,71 @@ send_keys %0 "0"  # ✓ Returns to search
 send_keys %0 "quit"  # ✓ Exits TUI
 ```
 
+### Selection Best Practices
+
+**IMPORTANT: Making Smart Selections from Search Results**
+
+When the TUI displays search results, you must analyze them carefully and make informed selections:
+
+**DO:**
+- ✅ **Review ALL search results** before selecting
+- ✅ **Look for tracks from "Greatest Hits", "Best Of", or compilation albums** when user wants best-of selections
+- ✅ **Consider track relevance**: Is this a well-known hit? Does it match what the user asked for?
+- ✅ **Explain your reasoning** before making selections (e.g., "I'll select positions 1, 5, and 23 because they're from Greatest Hits albums")
+- ✅ **Use thoughtful selection patterns** based on the actual results shown
+
+**DON'T:**
+- ❌ **Never select numbers just because they're sequential** (1 2 3) or from an example
+- ❌ **Don't ignore album information** - "Greatest Hits" albums often contain the best matches
+- ❌ **Don't select blindly** - actually read the artist, title, and album names
+- ❌ **Don't rush** - take time to identify the best matches
+
+**Selection Reasoning (Mandatory):**
+
+Before sending your selection to the TUI, you MUST explain your reasoning to the user. This ensures transparency and correct selections.
+
+**Example workflow:**
+```
+# After capturing search results showing 50 Tom Petty tracks
+User request: "Put three Tom Petty best of songs on the queue"
+
+# Your analysis (show to user):
+"I found 50 Tom Petty tracks. Reviewing the results:
+- Position 1: 'Free Fallin'' - Tom Petty and the Heartbreakers - Full Moon Fever (iconic hit)
+- Position 5: 'American Girl' - Tom Petty and the Heartbreakers - Tom Petty Greatest Hits (from best-of album)
+- Position 43: 'Learning to Fly' - Tom Petty and the Heartbreakers - Greatest Hits (from best-of album)
+
+I'll select tracks 1, 5, and 43 because they're well-known hits, with positions 5 and 43
+specifically from Greatest Hits albums."
+
+# Then send selection
+send_keys %0 "1 5 43"
+```
+
+**Pattern Recognition - What NOT to do:**
+
+❌ **Bad: Following examples blindly**
+```
+# User: "Put three Aimee Mann songs on queue"
+# Search shows 50 results
+# Agent thinks: "The prompt says '1 3 5' as an example, I'll use that"
+send_keys %0 "1 3 5"  # ✗ Blind pattern-matching!
+```
+
+✅ **Good: Analyzing results intelligently**
+```
+# User: "Put three Aimee Mann songs on queue"
+# Search shows 50 results
+# Agent captures results, reviews them, and explains:
+"I found 50 Aimee Mann tracks. Looking at the results:
+- Position 1: 'Save Me' - from Magnolia soundtrack (well-known hit)
+- Position 8: 'Wise Up' - from Magnolia (another iconic track)
+- Position 15: 'Save Me' - from Ultimate Collection (best-of version)
+
+I'll select 1, 8, and 15 because they're her most recognizable songs."
+send_keys %0 "1 8 15"  # ✓ Thoughtful selection!
+```
+
 ### TUI Lifecycle - Best Practices
 
 **Default Behavior: Keep Running**
@@ -441,6 +527,60 @@ tui_stop  # ✓ Only stop when actually done
 - **Statefulness**: Maintains session context
 - **Simplicity**: One less tool call per request
 - **Natural**: Matches how humans use TUI applications
+
+### CRITICAL: CLI Dispatcher Commands Work Independently of TUI
+
+**You can run CLI dispatcher commands via Bash tool while the TUI is running!**
+
+The TUI and CLI dispatcher are completely independent:
+- **TUI**: Runs in tmux session for search operations
+- **CLI dispatcher**: Executed via Bash tool for all other operations (queue, volume, playback, playlists)
+- **They do NOT interfere with each other**
+
+**Anti-Pattern - Unnecessary TUI Quitting:**
+```bash
+# ❌ WRONG - Don't quit TUI to run CLI commands
+tui_start
+send_keys %0 "Ani DiFranco"
+wait_for_prompt select
+capture_pane %0
+send_keys %0 "1 4 6 16"
+wait_for_prompt search
+capture_pane %0
+send_keys %0 "quit"           # ❌ Unnecessary quit!
+sonos_tool list_queue         # ❌ Could have done this while TUI was running!
+```
+
+**Correct Pattern - Keep TUI Running:**
+```bash
+# ✅ CORRECT - Use Bash tool for CLI commands while TUI stays running
+tui_start
+send_keys %0 "Ani DiFranco"
+wait_for_prompt select
+capture_pane %0
+send_keys %0 "1 4 6 16"
+wait_for_prompt search
+capture_pane %0
+# TUI stays at search prompt - ready for next search
+# Meanwhile, use Bash tool for other operations:
+sonos_tool list_queue         # ✅ Works fine! TUI still running
+sonos_tool play_from_queue 15 # ✅ Playback control via Bash
+sonos_tool set_volume 40      # ✅ Volume control via Bash
+# TUI is STILL RUNNING and ready for the next search!
+```
+
+**When to Use Each Tool:**
+- **TUI (via tmux tools)**: ONLY for search operations (track/album search and selection)
+- **CLI dispatcher (via Bash)**: For everything else (queue, volume, playback, playlists, current track, etc.)
+- **Both can be used simultaneously** - they are independent processes
+
+**Why This Matters:**
+- **Efficiency**: No need to quit/restart TUI between operations
+- **Simplicity**: Just use Bash tool for non-search commands
+- **Performance**: Saves 1-2 seconds per operation (no TUI restart)
+- **Correctness**: TUI stays ready for next search request
+
+**Remember:** Unless the user explicitly says "quit the TUI" or "I'm done searching", keep it running!
 
 ### TUI vs CLI Dispatcher Comparison
 
