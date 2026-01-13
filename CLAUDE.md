@@ -504,10 +504,19 @@ This pattern can be applied to other TUI applications:
 ## Setup and Installation
 
 ### Prerequisites
-- Python 3.10 or higher
+- **Python 3.13** (not 3.14 - see note below)
 - Sonos speaker on local network
 - Anthropic API key
 - Amazon Music account (configured with Sonos)
+
+**Python Version Note:**
+This project requires Python 3.13 (not 3.14+). The `pydantic-core` package (a dependency of `mcp` via `pydantic`) uses PyO3 for Rust bindings, which doesn't yet support Python 3.14. Attempting to use Python 3.14 will fail with compilation errors like `PyUnicode_New not found` due to Python 3.14's Unicode API changes.
+
+The project is configured to enforce this:
+- `pyproject.toml`: `requires-python = ">=3.13,<3.14"`
+- `.python-version`: `3.13` (uv will auto-select this version)
+
+If you have Python 3.14 as your system default, uv will automatically download and use Python 3.13 when you run `uv sync`.
 
 ### Installation Steps
 
