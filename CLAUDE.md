@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A comprehensive Sonos speaker control system with natural language interface using Claude AI. The project provides both programmatic Python APIs and an AI-powered conversational agent for controlling Sonos speakers through the Model Context Protocol (MCP).
+A comprehensive Sonos speaker control system with natural language interface using Claude AI. The project's focus is an AI-powered conversational agent for controlling Sonos speakers
 
 **Key Features:**
-- Natural language control: "Play Heart of Gold by Neil Young", "Turn it up", "Show my playlists"
-- **Dual execution modes**: MCP server (portable) or direct Python (efficient)
+- Natural language control: "Play Heart of Gold by Neil Young", "Play the album Nebraska", "Turn it up", "Show my playlists"
+- **Dual execution modes**: MCP Server Mode (portable) or Direct Code Mode using Bash tool to call python script (efficient)
+- **Interactive TUI mode**: Used in Direct Code mode: tmux-based interface for stateful track and album search workflows
 - **Agent Skills architecture** with progressive disclosure for efficient context usage
-- Music search across Amazon Music
+- Music search across Amazon Music (tracks and albums)
+- Intelligent album playback (starts from first track, not last)
 - Queue and playlist management
 - Volume control (adjust, set level, mute/unmute)
 - Multi-speaker support with dynamic speaker switching
@@ -42,14 +44,17 @@ Sonos Speakers (network)
 - When portability matters
 - Standard tool-based workflows
 
-**Context Overhead:** ~17% (~34k tokens for 21 MCP tool definitions)
+**Context Overhead:** ~17% (~34k tokens for 24 MCP tool definitions: 21 Sonos + 3 TUI lifecycle)
 
 ### Direct Mode (Efficient - Default)
 ```
 User/Client
     ↓
 Claude Agent SDK (claude_sdk_agent/)
-    ↓ Bash tool → Dispatcher Tool (sonos_tool.py)
+    ↓ Bash tool → Wrapper Scripts (in ~/.local/bin/):
+    │   ├── sonos_tool → sonos_tool.py (23 Sonos tools)
+    │   ├── tmux_tool → tmux_tool.py (6 tmux tools for TUI)
+    │   └── sonos_tui → sonos_interactive_tui.py (Interactive TUI)
     ↓ Direct Python imports
 Sonos Actions Library (sonos/)
     ↓ SoCo Library
@@ -57,13 +62,13 @@ Sonos Speakers (network)
 ```
 
 **Use Cases:**
-- Local development and testing
 - Complex workflows requiring multiple operations
 - Performance-critical operations
 - Batch operations
+- TUI-based interactive search workflows
 
 **Context Overhead:** ~2.5% (~5k tokens for skill metadata)
-**Token Savings:** ~15% compared to MCP mode
+**Token Savings:** ~15% compared to MCP mode (~29k tokens saved from no MCP tools + tmux_tool.py replacing tmux MCP)
 
 ### Switching Between Modes
 
@@ -83,9 +88,10 @@ python3 sdk_agent.py --mode mcp -p "play music"
 1. **Dual Execution**: Choose between MCP (portable) or direct (efficient)
 2. **Separation of Concerns**: MCP server runs as independent process when needed
 3. **Reusability**: MCP server works with any MCP-compatible client
-4. **Direct Efficiency**: Skip protocol overhead for local development
+4. **Direct Efficiency**: Skip protocol overhead for local development using CLI dispatchers
 5. **Standard Protocol**: Follows official MCP specification
 6. **Modular Knowledge**: Agent Skills provide domain expertise via progressive disclosure
+7. **CLI Dispatcher Pattern**: Direct mode uses lightweight Python CLIs (sonos_tool.py, tmux_tool.py) for ~1,500-1,800 token savings vs MCP
 
 ## Project Structure
 
@@ -97,9 +103,12 @@ sonos_mcp/
 │       │   ├── SKILL.md        # Main skill with workflows and tools
 │       │   └── references/     # Additional reference materials
 │       │       └── search_tips.md
-│       └── sonos-direct-code/  # Direct mode: Dispatcher tool interface
-│           ├── SKILL.md        # Tool documentation and workflows
-│           └── sonos_tool.py   # CLI dispatcher (21 discrete tools)
+│       ├── sonos-direct-code/  # Direct mode: Dispatcher tool interface
+│       │   ├── SKILL.md        # Tool documentation and workflows (includes TUI guide)
+│       │   └── sonos_tool.py   # CLI dispatcher (23 active tools: 19 Sonos + 4 TUI lifecycle)
+│       └── tmux-tool/          # Direct mode: tmux CLI dispatcher for TUI interaction
+│           ├── SKILL.md        # tmux tool documentation and TUI workflows
+│           └── tmux_tool.py    # CLI dispatcher (6 tools: session mgmt + TUI interaction)
 │
 ├── sonos/                      # Core Sonos control library
 │   ├── __init__.py
@@ -110,7 +119,7 @@ sonos_mcp/
 │   └── cli.py                  # Legacy CLI (not used by agent)
 │
 ├── sonos_mcp_server/           # Standalone MCP Server
-│   ├── server.py               # FastMCP server with 21 tools
+│   ├── server.py               # FastMCP server with 24 tools (21 Sonos + 3 TUI lifecycle)
 │   ├── requirements.txt        # MCP SDK dependencies
 │   ├── __init__.py
 │   └── README.md               # Server documentation
@@ -121,10 +130,26 @@ sonos_mcp/
 │   ├── requirements.txt        # Agent dependencies
 │   └── .env                    # ANTHROPIC_API_KEY (gitignored)
 │
+├── sonos_interactive_tui.py    # Interactive TUI for tmux-based workflows
+├── sonos_tool                  # Bash wrapper script for sonos_tool.py (copy to ~/.local/bin/)
+├── tmux_tool                   # Bash wrapper script for tmux_tool.py (copy to ~/.local/bin/)
+├── sonos_tui                   # Bash wrapper script for sonos_interactive_tui.py (copy to ~/.local/bin/)
 ├── pyproject.toml              # Project dependencies and metadata
 ├── CLAUDE.md                   # This file
 ├── IMPLEMENTATION_SUMMARY.md   # Technical implementation details
 └── README.md                   # User-facing documentation
+
+# User installation (wrapper scripts for simplified commands)
+~/.local/bin/
+├── sonos_tool                  # Wrapper → calls sonos_tool.py with venv Python
+├── tmux_tool                   # Wrapper → calls tmux_tool.py with venv Python
+└── sonos_tui                   # Wrapper → calls sonos_interactive_tui.py with venv Python
+
+# Runtime state (created at runtime, not in repo)
+~/.sonos/
+├── playlists/                  # Local playlist JSON files
+├── search_results/             # Cached search results from TUI
+└── tui_state.json              # TUI lifecycle state (status, pid, pane_id, current_prompt)
 ```
 
 ## Core Components
@@ -143,7 +168,7 @@ sonos_mcp/
 **Sonos Control Skill** (`.claude/skills/sonos-control/`) - Used in **MCP mode**:
 - **`SKILL.md`**: Comprehensive MCP tool documentation
   - YAML frontmatter: name and description for auto-discovery
-  - Tool descriptions: All 21 MCP tools with parameters
+  - Tool descriptions: All 24 MCP tools with parameters (21 Sonos + 3 TUI lifecycle)
   - Workflows: Step-by-step guides (basic playback, custom mixes, playlists)
   - Advanced patterns: Live performances, multi-room control, error handling
   - Best practices: Selection logic, ambiguity resolution, natural responses
@@ -153,16 +178,38 @@ sonos_mcp/
 **Sonos Direct Code Skill** (`.claude/skills/sonos-direct-code/`) - Used in **Direct mode**:
 - **`SKILL.md`**: Comprehensive dispatcher tool documentation
   - YAML frontmatter: name and description for auto-discovery
-  - Tool descriptions: All 21 CLI tools with arguments and usage examples
+  - Tool descriptions: 23 CLI tools with arguments and usage examples (19 Sonos + 4 TUI lifecycle)
   - Recommended tools: Current, working tools matching MCP functionality
   - Common workflows: Search/play, custom playlists, queue analysis
-  - Execution patterns: CLI command structure and examples
-  - Best practices: Error handling, two-step patterns, position indexing
+  - Execution patterns: Simplified commands via wrapper scripts (sonos_tool, tmux_tool, sonos_tui)
+  - Best practices: Error handling, two-step patterns, position indexing, state-based timing
+  - **Search type selection**: Clear guidance on when to use track vs album search (based on user intent)
+  - **Selection reasoning**: Mandatory analysis and explanation before selecting tracks/albums from search results
+  - **TUI/CLI independence**: TUI and CLI dispatcher work simultaneously without interference
+  - TUI lifecycle management: tui_status, tui_start, tui_stop, tui_wait_for_prompt tools
 - **`sonos_tool.py`**: Command-line dispatcher
-  - 21 discrete tools matching MCP functionality
-  - Automatic speaker initialization
+  - 23 active tools: 19 Sonos tools (2 search tools commented out) + 4 TUI lifecycle tools
+  - Automatic speaker initialization (except for TUI lifecycle tools)
   - Standardized error handling and output formatting
   - 1-indexed positions for user-friendly CLI experience
+  - State file coordination for TUI lifecycle management (~/.sonos/tui_state.json)
+
+**tmux Tool Skill** (`.claude/skills/tmux-tool/`) - Used in **Direct mode**:
+- **`SKILL.md`**: Comprehensive tmux dispatcher tool documentation
+  - YAML frontmatter: name and description for auto-discovery
+  - Tool descriptions: 6 CLI tools with parameters and usage examples
+  - Session management: find_session, create_session, get_pane, session_ready
+  - TUI interaction: capture_pane, send_keys
+  - Complete workflows: TUI interaction patterns, Sonos TUI integration
+  - Best practices: Pane ID management, error handling, text escaping
+  - Troubleshooting guide and technical details
+- **`tmux_tool.py`**: Command-line dispatcher (315 lines)
+  - 6 tools optimized for TUI interaction
+  - Automatic session creation via get_pane and session_ready
+  - Proper tmux command escaping (single quotes in text)
+  - Timeout protection (5 seconds per command)
+  - Adapted from tmux-mcp server (github.com/nickgnd/tmux-mcp)
+  - **Token efficiency**: ~200-500 tokens vs ~2,000 for tmux MCP server
 
 **Why Skills Over System Prompt:**
 - **Modularity**: Update skill independently of agent code
@@ -228,7 +275,7 @@ sonos_mcp/
 - Runs as separate process (launched by agent)
 - Auto-exits when client disconnects
 
-**Available Tools (21 total):**
+**Available Tools (24 total):**
 
 *Speaker Management (2 tools):*
 - `get_master_speaker` - Get current master speaker name
@@ -265,6 +312,12 @@ sonos_mcp/
 - `list_native_sonos_playlists` - Display all native Sonos playlists stored on Sonos system
 - `create_native_sonos_playlist_from_local` - Convert local playlist to native Sonos playlist (accessible in Sonos app)
 
+*TUI Lifecycle Management (4 tools):*
+- `tui_status` - Check TUI running status (returns JSON state)
+- `tui_start` - Start TUI in tmux session (auto-creates session if needed)
+- `tui_stop` - Gracefully stop running TUI instance
+- `tui_wait_for_prompt` - Wait for TUI to reach specific prompt state (search/select/play)
+
 **Server Initialization:**
 - Connects to master speaker with retry logic (up to 10 attempts)
 - Loads configuration from `sonos/config.py`
@@ -285,32 +338,185 @@ sonos_mcp/
 - Mode selection via `--mode` flag (default: direct)
 - Automatic skill discovery from `.claude/skills/`
 
-**Model**: Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+**Model**: Claude Haiku 4.5 (`claude-haiku-4-5-20251001`)
 
 **Key Components:**
 - **`sdk_agent.py`**: Main agent application
   - `SonosSDKAgent` class manages agent lifecycle
-  - **MCP mode**: Connects to external MCP server via stdio
-  - **Direct mode**: Uses Bash tool to call dispatcher (sonos_tool.py)
+  - **MCP mode**: Connects to external Sonos MCP server via stdio
+  - **Direct mode**: Uses Bash tool to call CLI dispatchers (sonos_tool.py + tmux_tool.py)
+  - **No MCP servers in direct mode** (removed tmux MCP for token efficiency)
   - Handles conversation flow and tool execution
   - Session management and logging
   - No hardcoded skill references (skills auto-discovered)
 
 - **`system_prompt.py`**: Lightweight agent personality
   - **`SONOS_SYSTEM_PROMPT`**: MCP mode prompt (references sonos-control skill)
-  - **`SONOS_DIRECT_MODE_PROMPT`**: Direct mode prompt (references sonos-direct-code skill)
+  - **`SONOS_DIRECT_MODE_PROMPT`**: Direct mode prompt (references sonos-direct-code + tmux-tool skills)
   - Agent role and behavioral guidelines
   - Core principles (proactive, knowledgeable, conversational)
   - Mode-specific execution instructions
+  - TUI-based search workflow guidance
   - **Does NOT contain** tool/function descriptions (moved to skills)
+
+### 5. Interactive TUI (`sonos_interactive_tui.py`)
+
+**Purpose**: Experimental interactive terminal UI for track and album search and queue building workflows using tmux.
+
+**Key Innovation**: Demonstrates how AI agents can interact with TUI applications through tmux by:
+- Launching a persistent TUI process (via tui_start from sonos_tool.py)
+- Capturing display state with `tmux_tool.py capture_pane`
+- Analyzing visible output
+- Sending keystrokes with `tmux_tool.py send_keys`
+- Repeating the interaction cycle
+
+**Search Type Support:**
+- **Track search (default)**: Send query without prefix (e.g., `Heart of Gold Neil Young`)
+- **Album search**: Send query with `album:` or `album ` prefix (e.g., `album: Nebraska Bruce Springsteen`)
+  - Both `album:` (with colon) and `album ` (with space) are supported
+  - Colon format is preferred but space also works for robustness
+
+**Workflow:**
+1. **Search**: Agent sends search query (track or album) → TUI displays numbered results
+2. **Analyze**: Agent captures and examines results (must review artist, title, album details)
+3. **Select**: Agent explains reasoning, then sends one or more item numbers → TUI adds to queue
+   - Single selection: `"1"` → Single item added
+   - Multi-selection: `"1 5 23"` → Multiple items added efficiently (based on analysis, not patterns)
+   - Agent must analyze results and explain selection (e.g., "selecting positions from Greatest Hits albums")
+   - Tracks: Added at end of queue
+   - Albums: All album tracks added sequentially to queue
+4. **Loop**: TUI returns to search prompt for next operation
+5. **Playback**: Agent uses `play_from_queue` tool for playback control
+
+**Selection Principle**: TUI prompt intentionally omits example numbers to prevent pattern-matching. Agents must analyze actual search results and make thoughtful selections based on user intent.
+
+**Advantages over CLI Dispatcher:**
+- **Stateful**: Single running process maintains context
+- **Integrated**: Search → select workflow in one session
+- **Efficient**: Multi-selection reduces redundant searches
+- **Flexible**: Agent has explicit control over playback timing
+- **Natural**: Mirrors human TUI interaction patterns
+
+**When to Use:**
+- All searches in Direct Code mode
+
+**When to Use CLI Dispatcher Instead:**
+- For all non-search operations in Direct Code mode
+
+**TUI/CLI Independence:**
+- TUI and CLI dispatcher can run simultaneously without interference
+- No need to quit TUI to run CLI commands (list_queue, play_from_queue, volume, etc.)
+- Use Bash tool for CLI commands while TUI stays running and ready for next search
+- Only quit TUI when user explicitly requests it or session is complete
+
+**Requirements:**
+- **tmux session named `"sonos"`** (create if doesn't exist)
+- tmux_tool.py dispatcher for session management and TUI interaction
+- Same dependencies as CLI dispatcher (`sonos_actions`, etc.)
+
+**tmux Session Convention:**
+- Always use session name: `"sonos"`
+- Agent should check if session exists with `tmux_tool.py find_session sonos`
+- If not found, create with `tmux_tool.py create_session sonos`
+- Get pane ID from session using `tmux_tool.py get_pane sonos`
+- Or use `tmux_tool.py session_ready sonos` for all-in-one setup
+
+**TUI Lifecycle Management:**
+
+The TUI can be managed programmatically using three lifecycle tools in the CLI dispatcher (`sonos_tool.py`):
+
+- **`tui_status`**: Check if TUI is running and get current state
+  - Returns JSON with: `status`, `current_prompt`, `pid`, `pane_id`, `last_updated`
+  - State file: `~/.sonos/tui_state.json`
+  - Use this to verify TUI availability before attempting interaction
+  - Performs health checks: validates both PID exists and tmux pane is alive
+
+- **`tui_start`**: Launch TUI in tmux session
+  - Auto-creates tmux session named "sonos" if it doesn't exist
+  - Starts TUI process and returns pane ID
+  - Updates state file with running status
+  - Returns error if TUI already running (prevents duplicate instances)
+  - Waits 1 second for initialization and verifies successful start
+
+- **`tui_stop`**: Gracefully terminate TUI
+  - Sends 'quit' command to TUI for clean shutdown
+  - Updates state file with stopped status
+  - Waits up to 3 seconds for graceful exit
+  - Safer than killing the process directly
+
+**State File Format** (`~/.sonos/tui_state.json`):
+```json
+{
+  "status": "running",           // "running" or "stopped"
+  "current_prompt": "search",    // "search", "select", or "play"
+  "pid": 12345,                  // TUI process ID
+  "pane_id": "%0",               // tmux pane identifier
+  "last_updated": "2025-01-16T10:30:45.123456"
+}
+```
+
+The state file is updated at key points:
+- TUI startup (status: "running", prompt: "search")
+- Prompt transitions (search → select → search)
+- TUI exit (status: "stopped")
+- State written atomically (temp file + rename) to prevent corruption
+
+**File Locations:**
+- TUI Script: `/home/slzatz/sonos_mcp/.claude/skills/sonos-direct-code/sonos_interactive_tui.py`
+- State File: `~/.sonos/tui_state.json` (tracks running status and current prompt)
+- Search Results:
+  - Track searches: `~/.sonos/search_results/track_search.json`
+  - Album searches: `~/.sonos/search_results/album_search.json`
+
+**Implementation Details:**
+
+The TUI intelligently handles both track and album searches with different behaviors:
+
+**Track Search:**
+- Saves results as dictionaries: `{"title": "...", "artist": "...", "album": "...", "item_id": "...", "uri": "..."}`
+- Adds single track to queue (or multiple with multi-selection)
+- Reports queue position(s) for agent's reference
+
+**Album Search:**
+- Saves results as dictionaries: `{"title": "Album Name", "artist": "...", "album": "Album Name", "item_id": "...", "uri": "..."}`
+- Adds all album tracks to queue sequentially (or multiple albums with multi-selection)
+- Tracks queue position BEFORE adding to determine first track position
+- Reports first and last positions for agent's reference
+- Example: Album with 10 tracks added to queue at positions 15-24 → reports positions 15-24
+
+**Multi-Selection:**
+- Supports selecting multiple items in one operation (e.g., `"1 3 5"`)
+- Reduces redundant searches when building queues
+- Reports cumulative range of queue positions for all added items
+
+**Compatibility:**
+- Saves search results to same JSON files as CLI tools
+- Uses same `sonos_actions` library
+- Can be used alongside CLI dispatcher
+
+**Broader Implications:**
+This pattern can be applied to other TUI applications:
+- Database CLIs (psql, sqlite3, mysql)
+- REPL environments (Python, Node.js, etc.)
+- Interactive command tools (htop, vim with commands, etc.)
+- Any TUI where agents need to observe state and respond dynamically
 
 ## Setup and Installation
 
 ### Prerequisites
-- Python 3.10 or higher
+- **Python 3.13** (not 3.14 - see note below)
 - Sonos speaker on local network
 - Anthropic API key
 - Amazon Music account (configured with Sonos)
+
+**Python Version Note:**
+This project requires Python 3.13 (not 3.14+). The `pydantic-core` package (a dependency of `mcp` via `pydantic`) uses PyO3 for Rust bindings, which doesn't yet support Python 3.14. Attempting to use Python 3.14 will fail with compilation errors like `PyUnicode_New not found` due to Python 3.14's Unicode API changes.
+
+The project is configured to enforce this:
+- `pyproject.toml`: `requires-python = ">=3.13,<3.14"`
+- `.python-version`: `3.13` (uv will auto-select this version)
+
+If you have Python 3.14 as your system default, uv will automatically download and use Python 3.13 when you run `uv sync`.
 
 ### Installation Steps
 
@@ -356,11 +562,11 @@ The agent supports two execution modes via the `--mode` flag:
 python3 sdk_agent.py              # No flag needed
 python3 sdk_agent.py --mode direct  # Explicit
 ```
-- Uses Bash tool to call CLI dispatcher (sonos_tool.py)
-- 21 discrete tools matching MCP functionality
-- Calls `sonos_actions` functions via dispatcher
-- ~15% token savings vs MCP mode
-- Ideal for: Local development, complex workflows, batch operations
+- Uses Bash tool to call CLI dispatchers (sonos_tool.py + tmux_tool.py)
+- 22 Sonos tools + 6 tmux tools matching MCP functionality
+- Calls `sonos_actions` functions and tmux commands ONLY via dispatchers
+- ~15% token savings vs MCP mode (~29k tokens: no MCP overhead + lightweight skills)
+- Ideal for: Local development, complex workflows, batch operations, TUI interaction
 
 **MCP Mode** - Portable, standardized:
 ```bash
@@ -481,33 +687,6 @@ python3 sdk_agent.py -p "play morning playlist" && echo "Music started!"
 🤖 Assistant: Successfully changed master speaker to Bedroom!
 ```
 
-### Using with Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "sonos": {
-      "command": "/full/path/to/.venv/bin/python3",
-      "args": ["/full/path/to/sonos_mcp_server/server.py"]
-    }
-  }
-}
-```
-
-Restart Claude Desktop. The Sonos tools will appear in the tool selector.
-
-### Testing with MCP Inspector
-
-```bash
-npx @modelcontextprotocol/inspector \
-  /full/path/to/.venv/bin/python3 \
-  /full/path/to/sonos_mcp_server/server.py
-```
-
-Opens web UI at `http://localhost:5173` for testing tools.
-
 ## Development Guide
 
 ### Adding New Tools
@@ -605,7 +784,7 @@ The direct mode dispatcher (`sonos_tool.py`) provides a stable CLI interface for
 
 4. Test from command line:
    ```bash
-   .venv/bin/python3 .claude/skills/sonos-direct-code/sonos_tool.py your_tool_name test_arg
+   sonos_tool your_tool_name test_arg
    ```
 
 **Design principles:**
@@ -626,31 +805,22 @@ When adding dispatcher tools, ensure they match the corresponding MCP tool in `s
 
 This maintains parity between direct and MCP modes.
 
-### Testing
+**TUI Lifecycle Tools:**
 
-**Test server startup:**
-```bash
-.venv/bin/python3 sonos_mcp_server/server.py
-# Should connect to speaker and start server
-```
+The dispatcher includes four special tools for managing the interactive TUI:
+- Not part of the core 21 Sonos tools
+- Enable programmatic TUI lifecycle management
+- Use state file (`~/.sonos/tui_state.json`) for coordination
+- Allow agents to check TUI status, start/stop TUI, and wait for state transitions
+- Bridge the gap between stateless CLI operations and stateful TUI workflows
+- Do not require speaker initialization (excluded from `no_speaker_tools` set)
 
-**Test specific tool:**
-```bash
-# Create test script
-cat > test_tool.py << 'EOF'
-from sonos import sonos_actions
-result = sonos_actions.your_function()
-print(result)
-EOF
-
-python3 test_tool.py
-```
-
-**Test agent integration:**
-```bash
-python3 claude_sdk_agent/sdk_agent.py -v
-# Ask Claude to use the new tool
-```
+These tools simplify TUI session management compared to manual tmux commands, providing:
+- Health checking (PID + tmux pane verification)
+- Atomic state file updates
+- Graceful shutdown mechanisms
+- Error prevention (e.g., detecting already-running instances)
+- State-based timing via `tui_wait_for_prompt` (replaces fixed sleep times with efficient polling)
 
 ### Code Organization
 
@@ -924,4 +1094,4 @@ Should show all Sonos speakers on network.
 - MCP Inspector (for testing)
 - Any MCP-compatible client
 
-All 21 tools are functional and tested end-to-end.
+All 24 MCP tools (21 Sonos + 3 TUI lifecycle) are functional and tested. The CLI dispatcher provides 22 active tools (19 Sonos + 3 TUI lifecycle, with 2 search tools commented out in favor of the TUI-based search workflow).

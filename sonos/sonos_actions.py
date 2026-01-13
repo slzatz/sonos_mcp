@@ -257,7 +257,9 @@ def add_album_to_queue(position):
     with file_path.open('r') as file:
         sonos_data = json.load(file)
 
-    item_id, uri = sonos_data[position-1]
+    album = sonos_data[position-1]
+    item_id = album["item_id"]
+    uri = album["uri"]
 
     #Note: the id appears to be necessary for track ddl but not for album ddl
     metadata = SONOS_DIDL.format(item_id=item_id, uri=uri)
@@ -286,8 +288,15 @@ def search_for_album(album):
         albums.append(f"{title} - {artist}")
 
         # Note: for the purpose of creating the DIDL string it appears that the item_id is unnecessary
-        item_id = quote(album_meta.get('id')) # the album ids have a # although doesn't seem to need escaping   
-        sonos_data.append([item_id, album.uri])
+        item_id = quote(album_meta.get('id')) # the album ids have a # although doesn't seem to need escaping
+        # Save as dict with display data (title, artist, album) + queue data (item_id, uri)
+        sonos_data.append({
+            "title": title,
+            "artist": artist,
+            "album": title,  # For albums, the album name is the title
+            "item_id": item_id,
+            "uri": album.uri
+        })
 
     filename = "album_search.json"
     file_path = Path.home() / ".sonos" / "search_results" / filename
