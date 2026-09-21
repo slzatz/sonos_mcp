@@ -1,7 +1,14 @@
 ---
 name: sonos-control
-description: "[MCP MODE ONLY] Control Sonos speakers through MCP tools - search and play music, manage queue and playlists, adjust volume. DO NOT USE in direct mode. Only use when running with --mode mcp flag."
+description: "[ARCHIVED - do not use] Former MCP-mode Sonos skill from the retired sonos_mcp project. For Sonos requests use the `sonos` CLI (github.com/slzatz/sonos_tool) and its skill instead."
 ---
+
+> **Archived (2026-09-21).** This skill belongs to the retired `sonos_mcp` project. Sonos
+> control now uses the standalone `sonos` CLI from
+> [slzatz/sonos_tool](https://github.com/slzatz/sonos_tool); its skill is
+> `~/sonos_tool/.claude/skills/sonos/SKILL.md`. Do not follow the instructions below for
+> live Sonos requests. The `sonos_tool`, `sonos_tui` and `tmux_tool` wrapper scripts they
+> reference have been removed, and the MCP server is no longer run.
 
 # Sonos Control
 

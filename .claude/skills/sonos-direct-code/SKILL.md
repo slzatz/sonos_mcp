@@ -1,7 +1,14 @@
 ---
 name: sonos-direct-code
-description: "[DIRECT MODE - DEFAULT] Sonos control via CLI dispatchers ONLY. NEVER import sonos_actions or write Python scripts - this bypasses architecture and is FORBIDDEN. ALL searches use Interactive TUI (mandatory). Use ONLY sonos_tool.py (23 tools: 19 Sonos + 4 TUI lifecycle) and tmux_tool.py (6 tools). If tools fail, REPORT error - never improvise workarounds."
+description: "[ARCHIVED - do not use] Former direct-mode Sonos skill (sonos_tool.py dispatcher + tmux TUI) from the retired sonos_mcp project. For Sonos requests use the `sonos` CLI (github.com/slzatz/sonos_tool) and its skill instead."
 ---
+
+> **Archived (2026-09-21).** This skill belongs to the retired `sonos_mcp` project. Sonos
+> control now uses the standalone `sonos` CLI from
+> [slzatz/sonos_tool](https://github.com/slzatz/sonos_tool); its skill is
+> `~/sonos_tool/.claude/skills/sonos/SKILL.md`. Do not follow the instructions below for
+> live Sonos requests. The `sonos_tool`, `sonos_tui` and `tmux_tool` wrapper scripts they
+> reference have been removed, and the MCP server is no longer run.
 
 # Sonos Direct Code
 

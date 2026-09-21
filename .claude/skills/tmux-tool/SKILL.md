@@ -1,7 +1,14 @@
 ---
 name: tmux-tool
-description: tmux session management and TUI interaction tools for direct mode. Use when you need to manage tmux sessions, capture pane output, or send keystrokes to interactive TUI applications.
+description: "[ARCHIVED - do not use] tmux dispatcher that existed only for the retired sonos_mcp TUI search workflow. The tmux_tool wrapper has been removed."
 ---
+
+> **Archived (2026-09-21).** This skill belongs to the retired `sonos_mcp` project. Sonos
+> control now uses the standalone `sonos` CLI from
+> [slzatz/sonos_tool](https://github.com/slzatz/sonos_tool); its skill is
+> `~/sonos_tool/.claude/skills/sonos/SKILL.md`. Do not follow the instructions below for
+> live Sonos requests. The `sonos_tool`, `sonos_tui` and `tmux_tool` wrapper scripts they
+> reference have been removed, and the MCP server is no longer run.
 
 # tmux Tool Dispatcher
 
