@@ -1,3 +1,9 @@
+> **Archived (2026-09-21).** Active development of Sonos control moved to
+> [slzatz/sonos_tool](https://github.com/slzatz/sonos_tool), a standalone `sonos` CLI
+> for humans and agents (`uv tool install --editable ~/sonos_tool`). This repository is
+> kept as a record of the MCP server, the Claude Agent SDK client, and the tmux TUI
+> experiment; it is not maintained.
+
 # An mcp and agent to interact with Sonos speakers
 
 The sonos mcp coupled with the sonos_agent allows control of the Sonos system through natural language interactioins with an LLM that leverages the ability of an LLM to use and sequence tools to accomplish a request and also takes advantage of the music-related information that the model was trained on.  The agent utilizes the claude agent sdk and the mcp uses the SoCo python package.
