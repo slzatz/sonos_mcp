@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **This repository is archived (2026-09-21).** Sonos control moved to
+> [slzatz/sonos_tool](https://github.com/slzatz/sonos_tool), a standalone `sonos` CLI
+> that lives at `~/sonos_tool` and has its own CLAUDE.md. Do not extend the MCP server,
+> the Agent SDK client, the tmux TUI, or `sonos_tool.py` here; make Sonos changes in
+> `sonos_tool`. The rest of this file describes the project as it was when archived.
+> Known to be stale: the `~/.local/bin` wrapper scripts it mentions have been removed, the
+> `../SoCo` editable dependency is no longer needed (the fix is in soco 0.31.2), and Amazon
+> Music now uses colon-style catalog ids that this code does not handle.
+
 ## Project Overview
 
 A comprehensive Sonos speaker control system with natural language interface using Claude AI. The project's focus is an AI-powered conversational agent for controlling Sonos speakers
